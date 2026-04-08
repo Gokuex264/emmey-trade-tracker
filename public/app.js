@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateDashboard();
   renderTradesTable();
   renderNotesList();
+  renderMyTradeSymbols();
   checkApiKey();
   setupEventListeners();
 
@@ -536,6 +537,77 @@ function setupEventListeners() {
       if (e.target === modal) modal.classList.add('hidden');
     });
   });
+
+  // Charts
+  document.getElementById('loadChartBtn').addEventListener('click', () => {
+    const sym = document.getElementById('chartSymbolInput').value.trim();
+    if (sym) loadChart(sym);
+  });
+  document.getElementById('chartSymbolInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const sym = e.target.value.trim();
+      if (sym) loadChart(sym);
+    }
+  });
+  document.querySelectorAll('.sym-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sym = btn.dataset.sym;
+      document.getElementById('chartSymbolInput').value = sym;
+      loadChart(sym);
+      document.querySelectorAll('.sym-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+}
+
+// ── CHARTS ───────────────────────────────────────────────────────────────────
+function loadChart(symbol) {
+  const interval = document.getElementById('chartInterval').value;
+  const container = document.getElementById('tradingview-widget-container');
+  const sym = symbol.toUpperCase();
+
+  const params = new URLSearchParams({
+    symbol: sym,
+    interval: interval,
+    theme: 'dark',
+    style: '1',
+    locale: 'en',
+    toolbar_bg: '#161b22',
+    enable_publishing: '0',
+    hide_top_toolbar: '0',
+    hide_legend: '0',
+    save_image: '1',
+    withdateranges: '1',
+    timezone: 'America/New_York',
+    utm_source: 'localhost',
+    utm_medium: 'widget',
+  });
+
+  container.innerHTML = `<iframe
+    src="https://www.tradingview.com/widgetembed/?${params.toString()}"
+    style="width:100%;height:100%;border:none;border-radius:8px;"
+    allowtransparency="true"
+    allowfullscreen
+    frameborder="0"
+  ></iframe>`;
+
+  // Update active chip
+  document.querySelectorAll('.sym-chip').forEach(b => {
+    b.classList.toggle('active', b.dataset.sym === sym);
+  });
+}
+
+function renderMyTradeSymbols() {
+  // Show unique symbols from user's trades as quick-click chips
+  const uniqueSymbols = [...new Set(trades.map(t => t.symbol.toUpperCase()))];
+  const wrapper = document.getElementById('myTradeSymbols');
+  const chipsEl = document.getElementById('tradeSymbolChips');
+  if (!uniqueSymbols.length) { wrapper.style.display = 'none'; return; }
+
+  wrapper.style.display = 'flex';
+  chipsEl.innerHTML = uniqueSymbols.map(sym =>
+    `<button class="sym-chip" data-sym="${sym}" onclick="document.getElementById('chartSymbolInput').value='${sym}';loadChart('${sym}')">${sym}</button>`
+  ).join('');
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────

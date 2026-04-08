@@ -441,6 +441,92 @@ tbody tr:hover { background: var(--bg3); }
   margin-left: 10px; border: 1px solid var(--border);
 }
 
+/* ── CHARTS ── */
+.chart-controls {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chart-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.chart-search-row input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+.chart-search-row input:focus { border-color: var(--blue); }
+.chart-search-row select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.quick-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.qs-label {
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 600;
+  margin-right: 2px;
+}
+.sym-chip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 4px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.sym-chip:hover { border-color: var(--blue); color: var(--blue); background: rgba(31,111,235,0.08); }
+.sym-chip.active { border-color: var(--blue); color: var(--blue); background: rgba(31,111,235,0.15); }
+
+.chart-container {
+  height: calc(100vh - 240px);
+  min-height: 500px;
+  padding: 0;
+  overflow: hidden;
+}
+.chart-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: var(--radius);
+}
+.tv-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tv-placeholder-inner {
+  text-align: center;
+  color: var(--text2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* ── MODAL ── */
 .modal {
   position: fixed; inset: 0;

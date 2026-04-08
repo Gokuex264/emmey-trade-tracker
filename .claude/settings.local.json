@@ -6,7 +6,10 @@
       "Bash(node server.js)",
       "Bash(curl -s http://localhost:3000/api/trades)",
       "Bash(taskkill /F /IM node.exe)",
-      "Bash(taskkill //F //IM node.exe)"
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(mkdir -p c:/Users/2025/Downloads/emmey123/emmey5/video-app/public)",
+      "Bash(mkdir -p c:/Users/2025/Downloads/emmey123/emmey5/video-app/uploads)",
+      "Bash(mkdir -p c:/Users/2025/Downloads/emmey123/emmey5/video-app/clips)"
     ]
   }
 }

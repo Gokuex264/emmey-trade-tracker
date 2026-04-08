@@ -23,6 +23,9 @@
       <button class="nav-btn" data-tab="notebook">
         <span>📓</span> Notebook
       </button>
+      <button class="nav-btn" data-tab="charts">
+        <span>📉</span> Charts
+      </button>
       <button class="nav-btn" data-tab="chat">
         <span>🤖</span> AI Analyst
       </button>
@@ -155,6 +158,63 @@
         <div class="notes-list card" id="notesList"></div>
         <div class="note-editor card" id="noteEditor">
           <div class="editor-placeholder">Select a note or create a new one</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CHARTS ── -->
+    <section id="tab-charts" class="tab">
+      <div class="page-header">
+        <h1>Charts</h1>
+      </div>
+
+      <!-- Symbol search + quick picks -->
+      <div class="chart-controls card">
+        <div class="chart-search-row">
+          <input type="text" id="chartSymbolInput" placeholder="Enter symbol: AAPL, ES1!, NQ1!, BTC, SPY..." />
+          <select id="chartInterval">
+            <option value="1">1m</option>
+            <option value="5">5m</option>
+            <option value="15">15m</option>
+            <option value="30">30m</option>
+            <option value="60" selected>1h</option>
+            <option value="D">1D</option>
+            <option value="W">1W</option>
+          </select>
+          <button class="btn-primary" id="loadChartBtn">Load Chart</button>
+        </div>
+        <div class="quick-symbols">
+          <span class="qs-label">Quick:</span>
+          <button class="sym-chip" data-sym="SPY">SPY</button>
+          <button class="sym-chip" data-sym="QQQ">QQQ</button>
+          <button class="sym-chip" data-sym="AAPL">AAPL</button>
+          <button class="sym-chip" data-sym="TSLA">TSLA</button>
+          <button class="sym-chip" data-sym="NVDA">NVDA</button>
+          <button class="sym-chip" data-sym="ES1!">ES1! (S&amp;P Futures)</button>
+          <button class="sym-chip" data-sym="NQ1!">NQ1! (Nasdaq Futures)</button>
+          <button class="sym-chip" data-sym="YM1!">YM1! (Dow Futures)</button>
+          <button class="sym-chip" data-sym="CL1!">CL1! (Crude Oil)</button>
+          <button class="sym-chip" data-sym="GC1!">GC1! (Gold)</button>
+          <button class="sym-chip" data-sym="BTCUSD">BTC</button>
+          <button class="sym-chip" data-sym="ETHUSD">ETH</button>
+        </div>
+        <!-- Trade symbols shortcut -->
+        <div id="myTradeSymbols" class="quick-symbols" style="display:none">
+          <span class="qs-label">My Trades:</span>
+          <span id="tradeSymbolChips"></span>
+        </div>
+      </div>
+
+      <!-- TradingView chart embed -->
+      <div class="chart-container card">
+        <div id="tradingview-widget-container" style="height:100%;width:100%">
+          <div id="tv-placeholder" class="tv-placeholder">
+            <div class="tv-placeholder-inner">
+              <span style="font-size:40px">📉</span>
+              <p>Enter a symbol above and click <strong>Load Chart</strong></p>
+              <p style="font-size:12px;color:var(--text2)">Supports stocks, futures (ES1!, NQ1!), crypto, forex, and more</p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
