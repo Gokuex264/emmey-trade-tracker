@@ -124,10 +124,7 @@ app.post('/api/chat', async (req, res) => {
   let tradeContext = '';
   if (trades.length > 0) {
     const tradeList = trades.map(t => {
-      const pnl = t.exitPrice && t.entryPrice
-        ? ((parseFloat(t.exitPrice) - parseFloat(t.entryPrice)) * parseFloat(t.quantity || 1) * (t.direction === 'short' ? -1 : 1)).toFixed(2)
-        : 'Open';
-      return `- ${t.symbol} | ${t.direction?.toUpperCase() || 'LONG'} | Entry: $${t.entryPrice} | Exit: ${t.exitPrice ? '$' + t.exitPrice : 'Open'} | Qty: ${t.quantity || 1} | P&L: ${pnl !== 'Open' ? '$' + pnl : 'Open'} | Status: ${t.status || 'open'} | Date: ${t.date || t.createdAt?.split('T')[0]} | Notes: ${t.notes || 'none'}`;
+      return `- ${t.symbol} | ${(t.assetType || 'stock').toUpperCase()} | ${(t.direction || 'long').toUpperCase()} | Bought At: ${t.entryPrice || '?'} | Sold At: ${t.exitPrice || 'Open'} | P&L: ${t.pnl || 'N/A'} | Status: ${t.status || 'open'} | Date: ${t.date || t.createdAt?.split('T')[0]} | Why I took it: ${t.reason || 'not noted'} | Notes: ${t.notes || 'none'}`;
     }).join('\n');
     tradeContext = `\n\nCurrent trades in portfolio:\n${tradeList}`;
   } else {

@@ -4,7 +4,9 @@
       "Bash(dir \"c:\\\\Users\\\\2025\\\\Downloads\\\\emmey123\\\\emmey5\")",
       "Bash(npm install:*)",
       "Bash(node server.js)",
-      "Bash(curl -s http://localhost:3000/api/trades)"
+      "Bash(curl -s http://localhost:3000/api/trades)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(taskkill //F //IM node.exe)"
     ]
   }
 }

@@ -72,26 +72,33 @@
           <form id="quickTradeForm" class="quick-form">
             <div class="form-row">
               <input type="text" name="symbol" placeholder="Symbol (e.g. AAPL)" required />
+              <select name="assetType">
+                <option value="stock">Stock</option>
+                <option value="options">Options</option>
+                <option value="futures">Futures</option>
+                <option value="crypto">Crypto</option>
+                <option value="forex">Forex</option>
+              </select>
+            </div>
+            <div class="form-row">
               <select name="direction">
                 <option value="long">Long</option>
                 <option value="short">Short</option>
               </select>
-            </div>
-            <div class="form-row">
-              <input type="number" name="entryPrice" placeholder="Entry Price" step="0.01" required />
-              <input type="number" name="quantity" placeholder="Quantity" step="0.01" required />
-            </div>
-            <div class="form-row">
               <input type="date" name="date" />
+            </div>
+            <div class="form-row">
+              <input type="text" name="entryPrice" placeholder="Price I bought at" required />
+              <input type="text" name="exitPrice" placeholder="Price I sold at" />
+            </div>
+            <div class="form-row">
+              <input type="text" name="pnl" placeholder="What I made / lost (e.g. +500)" />
               <select name="status">
                 <option value="open">Open</option>
                 <option value="closed">Closed</option>
               </select>
             </div>
-            <div id="exitPriceRow" class="form-row hidden">
-              <input type="number" name="exitPrice" placeholder="Exit Price" step="0.01" />
-            </div>
-            <textarea name="notes" placeholder="Trade notes..." rows="2"></textarea>
+            <textarea name="reason" placeholder="Why I took this trade..." rows="2"></textarea>
             <button type="submit" class="btn-primary">Add Trade</button>
           </form>
         </div>
@@ -122,11 +129,12 @@
           <thead>
             <tr>
               <th>Symbol</th>
+              <th>Type</th>
               <th>Dir</th>
-              <th>Entry</th>
-              <th>Exit</th>
-              <th>Qty</th>
+              <th>Bought At</th>
+              <th>Sold At</th>
               <th>P&amp;L</th>
+              <th>Why I Took It</th>
               <th>Date</th>
               <th>Status</th>
               <th>Actions</th>
@@ -200,7 +208,17 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Symbol *</label>
-            <input type="text" name="symbol" placeholder="AAPL" required />
+            <input type="text" name="symbol" placeholder="AAPL, ES, BTC..." required />
+          </div>
+          <div class="form-group">
+            <label>Asset Type</label>
+            <select name="assetType">
+              <option value="stock">Stock</option>
+              <option value="options">Options</option>
+              <option value="futures">Futures</option>
+              <option value="crypto">Crypto</option>
+              <option value="forex">Forex</option>
+            </select>
           </div>
           <div class="form-group">
             <label>Direction</label>
@@ -210,20 +228,20 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Entry Price *</label>
-            <input type="number" name="entryPrice" placeholder="0.00" step="0.01" required />
-          </div>
-          <div class="form-group">
-            <label>Exit Price</label>
-            <input type="number" name="exitPrice" placeholder="0.00" step="0.01" />
-          </div>
-          <div class="form-group">
-            <label>Quantity *</label>
-            <input type="number" name="quantity" placeholder="1" step="0.01" required />
-          </div>
-          <div class="form-group">
             <label>Date</label>
             <input type="date" name="date" />
+          </div>
+          <div class="form-group">
+            <label>Price I Bought At *</label>
+            <input type="text" name="entryPrice" placeholder="e.g. 1.50, 4250.00" required />
+          </div>
+          <div class="form-group">
+            <label>Price I Sold At</label>
+            <input type="text" name="exitPrice" placeholder="e.g. 3.00, 4310.00" />
+          </div>
+          <div class="form-group">
+            <label>What I Made / Lost</label>
+            <input type="text" name="pnl" placeholder="e.g. +500, -200" />
           </div>
           <div class="form-group">
             <label>Status</label>
@@ -232,20 +250,14 @@
               <option value="closed">Closed</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Asset Type</label>
-            <select name="assetType">
-              <option value="stock">Stock</option>
-              <option value="crypto">Crypto</option>
-              <option value="forex">Forex</option>
-              <option value="options">Options</option>
-              <option value="futures">Futures</option>
-            </select>
-          </div>
         </div>
         <div class="form-group full-width">
-          <label>Notes</label>
-          <textarea name="notes" placeholder="Trade notes, strategy, reason for entry/exit..." rows="3"></textarea>
+          <label>Why I Took This Trade</label>
+          <textarea name="reason" placeholder="Setup I saw, indicator, news catalyst, pattern..." rows="3"></textarea>
+        </div>
+        <div class="form-group full-width">
+          <label>Additional Notes</label>
+          <textarea name="notes" placeholder="Emotions, mistakes, what I learned..." rows="2"></textarea>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn-secondary close-modal">Cancel</button>

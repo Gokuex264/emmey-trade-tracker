@@ -51,21 +51,19 @@ async function loadNotes() {
   } catch (e) { notes = []; }
 }
 
-// ── P&L CALCULATION ─────────────────────────────────────────────────────────
-function calcPnL(trade) {
-  if (!trade.exitPrice || !trade.entryPrice) return null;
-  const entry = parseFloat(trade.entryPrice);
-  const exit = parseFloat(trade.exitPrice);
-  const qty = parseFloat(trade.quantity) || 1;
-  const mult = trade.direction === 'short' ? -1 : 1;
-  return ((exit - entry) * qty * mult);
+// ── P&L DISPLAY ─────────────────────────────────────────────────────────────
+function getPnL(trade) {
+  if (!trade.pnl) return null;
+  return trade.pnl.toString().trim();
 }
 
-function formatPnL(pnl) {
-  if (pnl === null) return '<span class="pnl-open">Open</span>';
-  const cls = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
-  const sign = pnl >= 0 ? '+' : '';
-  return `<span class="${cls}">${sign}$${pnl.toFixed(2)}</span>`;
+function formatPnL(raw) {
+  if (!raw) return '<span class="pnl-open">—</span>';
+  const num = parseFloat(raw.replace(/[^0-9.\-+]/g, ''));
+  if (isNaN(num)) return `<span class="pnl-open">${escHtml(raw)}</span>`;
+  const cls = num >= 0 ? 'pnl-pos' : 'pnl-neg';
+  const sign = num >= 0 && !raw.startsWith('+') ? '+' : '';
+  return `<span class="${cls}">${sign}${raw}</span>`;
 }
 
 // ── DASHBOARD ───────────────────────────────────────────────────────────────
@@ -73,9 +71,17 @@ function updateDashboard() {
   const total = trades.length;
   const openTrades = trades.filter(t => t.status === 'open' || !t.status);
   const closedTrades = trades.filter(t => t.status === 'closed');
-  const winning = closedTrades.filter(t => (calcPnL(t) || 0) > 0);
-  const winRate = closedTrades.length ? Math.round((winning.length / closedTrades.length) * 100) : 0;
-  const totalPnL = closedTrades.reduce((sum, t) => sum + (calcPnL(t) || 0), 0);
+
+  // Win rate based on manually entered pnl
+  const closedWithPnl = closedTrades.filter(t => t.pnl);
+  const winning = closedWithPnl.filter(t => parseFloat(t.pnl.replace(/[^0-9.\-+]/g, '')) > 0);
+  const winRate = closedWithPnl.length ? Math.round((winning.length / closedWithPnl.length) * 100) : 0;
+
+  // Total P&L from manually entered values
+  const totalPnL = closedWithPnl.reduce((sum, t) => {
+    const n = parseFloat(t.pnl.replace(/[^0-9.\-+]/g, ''));
+    return sum + (isNaN(n) ? 0 : n);
+  }, 0);
 
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-winrate').textContent = `${winRate}%`;
@@ -91,16 +97,16 @@ function updateDashboard() {
     el.innerHTML = '<div class="empty-state">No trades yet. Add your first trade!</div>';
     return;
   }
-  el.innerHTML = recent.map(t => {
-    const pnl = calcPnL(t);
-    return `<div class="recent-item">
+  el.innerHTML = recent.map(t => `
+    <div class="recent-item">
       <div>
         <span class="recent-symbol">${t.symbol.toUpperCase()}</span>
-        <span class="badge badge-${t.direction || 'long'}" style="margin-left:8px">${(t.direction || 'long').toUpperCase()}</span>
+        <span class="badge badge-${t.assetType || 'stock'}" style="margin-left:8px">${(t.assetType || 'stock').toUpperCase()}</span>
+        <span class="badge badge-${t.direction || 'long'}" style="margin-left:4px">${(t.direction || 'long').toUpperCase()}</span>
       </div>
-      <div>${formatPnL(pnl)}</div>
-    </div>`;
-  }).join('');
+      <div>${formatPnL(t.pnl)}</div>
+    </div>`
+  ).join('');
 }
 
 // ── TRADES TABLE ─────────────────────────────────────────────────────────────
@@ -123,15 +129,16 @@ function renderTradesTable() {
   }
 
   tbody.innerHTML = filtered.map(t => {
-    const pnl = calcPnL(t);
     const date = t.date || t.createdAt?.split('T')[0] || '';
+    const reason = t.reason ? escHtml(t.reason.slice(0, 60)) + (t.reason.length > 60 ? '…' : '') : '—';
     return `<tr>
       <td><strong>${t.symbol.toUpperCase()}</strong></td>
+      <td><span class="badge badge-${t.assetType || 'stock'}">${(t.assetType || 'stock').toUpperCase()}</span></td>
       <td><span class="badge badge-${t.direction || 'long'}">${(t.direction || 'long').toUpperCase()}</span></td>
-      <td>$${parseFloat(t.entryPrice).toFixed(2)}</td>
-      <td>${t.exitPrice ? '$' + parseFloat(t.exitPrice).toFixed(2) : '—'}</td>
-      <td>${t.quantity || 1}</td>
-      <td>${formatPnL(pnl)}</td>
+      <td>${t.entryPrice || '—'}</td>
+      <td>${t.exitPrice || '—'}</td>
+      <td>${formatPnL(t.pnl)}</td>
+      <td style="max-width:200px;color:var(--text2);font-size:12px">${reason}</td>
       <td>${date}</td>
       <td><span class="badge badge-${t.status || 'open'}">${(t.status || 'open').toUpperCase()}</span></td>
       <td>
@@ -174,6 +181,8 @@ async function saveTrade(e) {
 
   // Clean up empty fields
   if (!data.exitPrice) delete data.exitPrice;
+  if (!data.pnl) delete data.pnl;
+  if (!data.reason) delete data.reason;
   if (!data.notes) delete data.notes;
 
   try {
@@ -205,6 +214,8 @@ async function quickAddTrade(e) {
   const form = e.target;
   const data = Object.fromEntries(new FormData(form).entries());
   if (!data.exitPrice) delete data.exitPrice;
+  if (!data.pnl) delete data.pnl;
+  if (!data.reason) delete data.reason;
 
   try {
     const res = await fetch('/api/trades', {
@@ -473,11 +484,6 @@ function setupEventListeners() {
   document.getElementById('tradeForm').addEventListener('submit', saveTrade);
   document.querySelectorAll('.close-modal').forEach(b => {
     b.addEventListener('click', () => document.getElementById('tradeModal').classList.add('hidden'));
-  });
-
-  // Quick form status → show exit price
-  document.querySelector('#quickTradeForm [name="status"]').addEventListener('change', (e) => {
-    document.getElementById('exitPriceRow').classList.toggle('hidden', e.target.value !== 'closed');
   });
 
   // Quick trade form
