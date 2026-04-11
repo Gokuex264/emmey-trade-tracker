@@ -7,254 +7,636 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="logo">
-      <span class="logo-icon">📈</span>
-      <span class="logo-text">TradeTracker</span>
-    </div>
-    <nav>
-      <button class="nav-btn active" data-tab="dashboard">
-        <span>📊</span> Dashboard
-      </button>
-      <button class="nav-btn" data-tab="trades">
-        <span>💼</span> Trades
-      </button>
-      <button class="nav-btn" data-tab="notebook">
-        <span>📓</span> Notebook
-      </button>
-      <button class="nav-btn" data-tab="charts">
-        <span>📉</span> Charts
-      </button>
-      <button class="nav-btn" data-tab="chat">
-        <span>🤖</span> AI Analyst
-      </button>
-    </nav>
-    <div class="sidebar-footer">
-      <button id="settingsBtn" class="settings-btn">⚙️ Settings</button>
-    </div>
-  </aside>
 
-  <!-- MAIN CONTENT -->
-  <main class="main">
+  <!-- ── AUTH SCREEN ── -->
+  <div id="authScreen" class="auth-screen hidden">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <span style="font-size:40px">📈</span>
+        <h1>TradeTracker</h1>
+        <p>Track your trades. Grow your edge.</p>
+      </div>
 
-    <!-- ── DASHBOARD ── -->
-    <section id="tab-dashboard" class="tab active">
-      <div class="page-header">
-        <h1>Dashboard</h1>
-        <span class="date-display" id="dateDisplay"></span>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="loginTabBtn">Log In</button>
+        <button class="auth-tab" id="registerTabBtn">Create Account</button>
       </div>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total Trades</div>
-          <div class="stat-value" id="stat-total">0</div>
+
+      <!-- Login Form -->
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="loginUsername" placeholder="Your username" autocomplete="username" required />
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Win Rate</div>
-          <div class="stat-value" id="stat-winrate">0%</div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="Your password" autocomplete="current-password" required />
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Total P&amp;L</div>
-          <div class="stat-value" id="stat-pnl">$0.00</div>
+        <div id="loginError" class="auth-error hidden"></div>
+        <button type="submit" class="btn-primary full-width">Log In</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" class="auth-form hidden">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="regUsername" placeholder="Choose a username (min 3 chars)" autocomplete="username" required />
         </div>
-        <div class="stat-card">
-          <div class="stat-label">Open Trades</div>
-          <div class="stat-value" id="stat-open">0</div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="regPassword" placeholder="Choose a password (min 6 chars)" autocomplete="new-password" required />
         </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="regConfirm" placeholder="Repeat your password" autocomplete="new-password" required />
+        </div>
+        <div id="registerError" class="auth-error hidden"></div>
+        <button type="submit" class="btn-primary full-width">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── APP (shown after login) ── -->
+  <div id="appWrapper" class="hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">📈</span>
+        <span class="logo-text">TradeTracker</span>
       </div>
-      <div class="dashboard-bottom">
-        <div class="recent-trades-card card">
-          <div class="card-header">
-            <h2>Recent Trades</h2>
-            <button class="btn-sm" onclick="showTab('trades')">View All</button>
+      <nav>
+        <button class="nav-btn active" data-tab="dashboard">
+          <span>📊</span> Dashboard
+        </button>
+        <button class="nav-btn" data-tab="trades">
+          <span>💼</span> Trades
+        </button>
+        <button class="nav-btn" data-tab="notebook">
+          <span>📓</span> Notebook
+        </button>
+        <button class="nav-btn" data-tab="charts">
+          <span>📉</span> Charts
+        </button>
+        <button class="nav-btn" data-tab="chat">
+          <span>🤖</span> AI Analyst
+        </button>
+        <button class="nav-btn" data-tab="brokers">
+          <span>🔗</span> Brokers
+        </button>
+        <button class="nav-btn" data-tab="trading">
+          <span>⚡</span> Trading
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <span class="user-avatar">👤</span>
+          <span id="sidebarUsername" class="user-name"></span>
+        </div>
+        <button id="settingsBtn" class="settings-btn">⚙️ Settings</button>
+        <button id="logoutBtn" class="logout-btn">🚪 Log Out</button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+      <!-- ── DASHBOARD ── -->
+      <section id="tab-dashboard" class="tab active">
+        <div class="page-header">
+          <h1>Dashboard</h1>
+          <span class="date-display" id="dateDisplay"></span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Trades</div>
+            <div class="stat-value" id="stat-total">0</div>
           </div>
-          <div id="recentTradesList" class="recent-list"></div>
+          <div class="stat-card">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-value" id="stat-winrate">0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total P&amp;L</div>
+            <div class="stat-value" id="stat-pnl">$0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Open Trades</div>
+            <div class="stat-value" id="stat-open">0</div>
+          </div>
         </div>
-        <div class="quick-add-card card">
-          <div class="card-header"><h2>Quick Add Trade</h2></div>
-          <form id="quickTradeForm" class="quick-form">
-            <div class="form-row">
-              <input type="text" name="symbol" placeholder="Symbol (e.g. AAPL)" required />
-              <select name="assetType">
-                <option value="stock">Stock</option>
-                <option value="options">Options</option>
-                <option value="futures">Futures</option>
-                <option value="crypto">Crypto</option>
-                <option value="forex">Forex</option>
-              </select>
+        <div class="dashboard-bottom">
+          <div class="recent-trades-card card">
+            <div class="card-header">
+              <h2>Recent Trades</h2>
+              <button class="btn-sm" onclick="showTab('trades')">View All</button>
             </div>
-            <div class="form-row">
-              <select name="direction">
-                <option value="long">Long</option>
-                <option value="short">Short</option>
-              </select>
-              <input type="date" name="date" />
-            </div>
-            <div class="form-row">
-              <input type="text" name="entryPrice" placeholder="Price I bought at" required />
-              <input type="text" name="exitPrice" placeholder="Price I sold at" />
-            </div>
-            <div class="form-row">
-              <input type="text" name="pnl" placeholder="What I made / lost (e.g. +500)" />
-              <select name="status">
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-              </select>
-            </div>
-            <textarea name="reason" placeholder="Why I took this trade..." rows="2"></textarea>
-            <button type="submit" class="btn-primary">Add Trade</button>
-          </form>
+            <div id="recentTradesList" class="recent-list"></div>
+          </div>
+          <div class="quick-add-card card">
+            <div class="card-header"><h2>Quick Add Trade</h2></div>
+            <form id="quickTradeForm" class="quick-form">
+              <div class="form-row">
+                <input type="text" name="symbol" placeholder="Symbol (e.g. AAPL)" required />
+                <select name="assetType">
+                  <option value="stock">Stock</option>
+                  <option value="options">Options</option>
+                  <option value="futures">Futures</option>
+                  <option value="crypto">Crypto</option>
+                  <option value="forex">Forex</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <select name="direction">
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+                <input type="date" name="date" />
+              </div>
+              <div class="form-row">
+                <input type="text" name="entryPrice" placeholder="Price I bought at" required />
+                <input type="text" name="exitPrice" placeholder="Price I sold at" />
+              </div>
+              <div class="form-row">
+                <input type="text" name="pnl" placeholder="What I made / lost (e.g. +500)" />
+                <select name="status">
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+              <textarea name="reason" placeholder="Why I took this trade..." rows="2"></textarea>
+              <button type="submit" class="btn-primary">Add Trade</button>
+            </form>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- ── TRADES ── -->
-    <section id="tab-trades" class="tab">
-      <div class="page-header">
-        <h1>Trades</h1>
-        <button class="btn-primary" id="openTradeModal">+ New Trade</button>
-      </div>
-      <div class="filters card">
-        <input type="text" id="tradeSearch" placeholder="Search symbol..." />
-        <select id="tradeStatusFilter">
-          <option value="all">All Status</option>
-          <option value="open">Open</option>
-          <option value="closed">Closed</option>
-        </select>
-        <select id="tradeDirFilter">
-          <option value="all">All Directions</option>
-          <option value="long">Long</option>
-          <option value="short">Short</option>
-        </select>
-      </div>
-      <div class="table-wrapper card">
-        <table id="tradesTable">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Type</th>
-              <th>Dir</th>
-              <th>Bought At</th>
-              <th>Sold At</th>
-              <th>P&amp;L</th>
-              <th>Why I Took It</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="tradesBody"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ── NOTEBOOK ── -->
-    <section id="tab-notebook" class="tab">
-      <div class="page-header">
-        <h1>Notebook</h1>
-        <button class="btn-primary" id="newNoteBtn">+ New Note</button>
-      </div>
-      <div class="notebook-layout">
-        <div class="notes-list card" id="notesList"></div>
-        <div class="note-editor card" id="noteEditor">
-          <div class="editor-placeholder">Select a note or create a new one</div>
+      <!-- ── TRADES ── -->
+      <section id="tab-trades" class="tab">
+        <div class="page-header">
+          <h1>Trades</h1>
+          <button class="btn-primary" id="openTradeModal">+ New Trade</button>
         </div>
-      </div>
-    </section>
-
-    <!-- ── CHARTS ── -->
-    <section id="tab-charts" class="tab">
-      <div class="page-header">
-        <h1>Charts</h1>
-      </div>
-
-      <!-- Symbol search + quick picks -->
-      <div class="chart-controls card">
-        <div class="chart-search-row">
-          <input type="text" id="chartSymbolInput" placeholder="Enter symbol: AAPL, ES1!, NQ1!, BTC, SPY..." />
-          <select id="chartInterval">
-            <option value="1">1m</option>
-            <option value="5">5m</option>
-            <option value="15">15m</option>
-            <option value="30">30m</option>
-            <option value="60" selected>1h</option>
-            <option value="D">1D</option>
-            <option value="W">1W</option>
+        <div class="filters card">
+          <input type="text" id="tradeSearch" placeholder="Search symbol..." />
+          <select id="tradeStatusFilter">
+            <option value="all">All Status</option>
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
           </select>
-          <button class="btn-primary" id="loadChartBtn">Load Chart</button>
+          <select id="tradeDirFilter">
+            <option value="all">All Directions</option>
+            <option value="long">Long</option>
+            <option value="short">Short</option>
+          </select>
         </div>
-        <div class="quick-symbols">
-          <span class="qs-label">Quick:</span>
-          <button class="sym-chip" data-sym="SPY">SPY</button>
-          <button class="sym-chip" data-sym="QQQ">QQQ</button>
-          <button class="sym-chip" data-sym="AAPL">AAPL</button>
-          <button class="sym-chip" data-sym="TSLA">TSLA</button>
-          <button class="sym-chip" data-sym="NVDA">NVDA</button>
-          <button class="sym-chip" data-sym="ES1!">ES1! (S&amp;P Futures)</button>
-          <button class="sym-chip" data-sym="NQ1!">NQ1! (Nasdaq Futures)</button>
-          <button class="sym-chip" data-sym="YM1!">YM1! (Dow Futures)</button>
-          <button class="sym-chip" data-sym="CL1!">CL1! (Crude Oil)</button>
-          <button class="sym-chip" data-sym="GC1!">GC1! (Gold)</button>
-          <button class="sym-chip" data-sym="BTCUSD">BTC</button>
-          <button class="sym-chip" data-sym="ETHUSD">ETH</button>
+        <div class="table-wrapper card">
+          <table id="tradesTable">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th>Dir</th>
+                <th>Bought At</th>
+                <th>Sold At</th>
+                <th>P&amp;L</th>
+                <th>Why I Took It</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tradesBody"></tbody>
+          </table>
         </div>
-        <!-- Trade symbols shortcut -->
-        <div id="myTradeSymbols" class="quick-symbols" style="display:none">
-          <span class="qs-label">My Trades:</span>
-          <span id="tradeSymbolChips"></span>
-        </div>
-      </div>
+      </section>
 
-      <!-- TradingView chart embed -->
-      <div class="chart-container card">
-        <div id="tradingview-widget-container" style="height:100%;width:100%">
-          <div id="tv-placeholder" class="tv-placeholder">
-            <div class="tv-placeholder-inner">
-              <span style="font-size:40px">📉</span>
-              <p>Enter a symbol above and click <strong>Load Chart</strong></p>
-              <p style="font-size:12px;color:var(--text2)">Supports stocks, futures (ES1!, NQ1!), crypto, forex, and more</p>
+      <!-- ── NOTEBOOK ── -->
+      <section id="tab-notebook" class="tab">
+
+        <!-- VIEW 1: Notebooks grid -->
+        <div id="notebooksListView">
+          <div class="page-header">
+            <h1>Notebooks</h1>
+            <button class="btn-primary" id="newNotebookBtn">+ New Notebook</button>
+          </div>
+          <div id="notebooksGrid" class="notebooks-grid"></div>
+        </div>
+
+        <!-- VIEW 2: Inside a notebook (pages + editor) -->
+        <div id="notebookOpenView" class="hidden notebook-fullscreen">
+          <div class="notebook-topbar">
+            <button class="btn-back" id="backToNotebooks">← Notebooks</button>
+            <h2 class="notebook-open-title" id="openNotebookTitle"></h2>
+            <div style="display:flex;gap:8px;margin-left:auto">
+              <button class="btn-primary" id="newPageBtn">+ New Page</button>
+            </div>
+          </div>
+          <div class="notebook-open-layout">
+
+            <!-- Pages sidebar -->
+            <div class="pages-sidebar">
+              <div class="pages-sidebar-header">Pages</div>
+              <div class="pages-list" id="pagesList"></div>
+            </div>
+
+            <!-- Full-screen editor -->
+            <div class="page-editor-wrap" id="pageEditorWrap">
+              <div class="editor-empty-state" id="editorEmptyState">
+                <div style="font-size:40px">📄</div>
+                <p>Select a page or create a new one</p>
+              </div>
+
+              <div id="editorPanel" class="hidden" style="display:flex;flex-direction:column;height:100%">
+                <!-- Toolbar -->
+                <div class="editor-toolbar">
+                  <button class="toolbar-btn" title="Bold" onclick="fmt('bold')"><b>B</b></button>
+                  <button class="toolbar-btn" title="Italic" onclick="fmt('italic')"><i>I</i></button>
+                  <button class="toolbar-btn" title="Underline" onclick="fmt('underline')"><u>U</u></button>
+                  <div class="toolbar-sep"></div>
+                  <button class="toolbar-btn" title="Insert Photo" onclick="triggerImageUpload()">📷 Insert Photo</button>
+                  <input type="file" id="imageFileInput" accept="image/*" style="display:none" />
+                  <div class="toolbar-sep"></div>
+                  <span style="color:var(--text2);font-size:12px;margin-right:4px">Tags:</span>
+                  <input class="tags-input-inline" id="pageTags" placeholder="e.g. review, setup, lesson..." />
+                  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+                    <span class="autosave-indicator" id="autosaveIndicator"></span>
+                    <button class="btn-del toolbar-btn" id="deletePageBtn">🗑 Delete</button>
+                  </div>
+                </div>
+
+                <!-- Title -->
+                <input class="editor-title-input" id="pageTitle" placeholder="Page title..." />
+
+                <!-- Body (contenteditable) -->
+                <div class="page-body" id="pageBody" contenteditable="true" spellcheck="true"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ── CHARTS ── -->
+      <section id="tab-charts" class="tab">
+        <div class="page-header">
+          <h1>Charts</h1>
+        </div>
+        <div class="chart-controls card">
+          <div class="chart-search-row">
+            <input type="text" id="chartSymbolInput" placeholder="Enter symbol: AAPL, ES1!, NQ1!, BTC, SPY..." />
+            <select id="chartInterval">
+              <option value="1">1m</option>
+              <option value="5">5m</option>
+              <option value="15">15m</option>
+              <option value="30">30m</option>
+              <option value="60" selected>1h</option>
+              <option value="D">1D</option>
+              <option value="W">1W</option>
+            </select>
+            <button class="btn-primary" id="loadChartBtn">Load Chart</button>
+          </div>
+          <div class="quick-symbols">
+            <span class="qs-label">Quick:</span>
+            <button class="sym-chip" data-sym="SPY">SPY</button>
+            <button class="sym-chip" data-sym="QQQ">QQQ</button>
+            <button class="sym-chip" data-sym="AAPL">AAPL</button>
+            <button class="sym-chip" data-sym="TSLA">TSLA</button>
+            <button class="sym-chip" data-sym="NVDA">NVDA</button>
+            <button class="sym-chip" data-sym="ES1!">ES1! (S&amp;P Futures)</button>
+            <button class="sym-chip" data-sym="NQ1!">NQ1! (Nasdaq Futures)</button>
+            <button class="sym-chip" data-sym="YM1!">YM1! (Dow Futures)</button>
+            <button class="sym-chip" data-sym="CL1!">CL1! (Crude Oil)</button>
+            <button class="sym-chip" data-sym="GC1!">GC1! (Gold)</button>
+            <button class="sym-chip" data-sym="BTCUSD">BTC</button>
+            <button class="sym-chip" data-sym="ETHUSD">ETH</button>
+          </div>
+          <div id="myTradeSymbols" class="quick-symbols" style="display:none">
+            <span class="qs-label">My Trades:</span>
+            <span id="tradeSymbolChips"></span>
+          </div>
+        </div>
+        <div class="chart-container card">
+          <div id="tradingview-widget-container" style="height:100%;width:100%">
+            <div id="tv-placeholder" class="tv-placeholder">
+              <div class="tv-placeholder-inner">
+                <span style="font-size:40px">📉</span>
+                <p>Enter a symbol above and click <strong>Load Chart</strong></p>
+                <p style="font-size:12px;color:var(--text2)">Supports stocks, futures (ES1!, NQ1!), crypto, forex, and more</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- ── AI CHAT ── -->
-    <section id="tab-chat" class="tab">
-      <div class="page-header">
-        <h1>AI Analyst <span class="powered-by">Powered by Claude</span></h1>
-      </div>
-      <div class="chat-layout">
-        <div class="chat-messages" id="chatMessages">
-          <div class="chat-welcome">
-            <div class="welcome-icon">🤖</div>
-            <h3>Claude AI Trading Analyst</h3>
-            <p>Ask me anything about your trades, strategies, or market concepts. I have access to your trade data and can provide personalized insights.</p>
-            <div class="suggestion-chips">
-              <button class="chip" onclick="sendSuggestion('What is my overall win rate?')">Win Rate</button>
-              <button class="chip" onclick="sendSuggestion('Which of my trades had the best return?')">Best Trade</button>
-              <button class="chip" onclick="sendSuggestion('Analyze my trading patterns and give me advice')">Analyze Patterns</button>
-              <button class="chip" onclick="sendSuggestion('What are my open positions?')">Open Positions</button>
+      <!-- ── AI CHAT ── -->
+      <section id="tab-chat" class="tab">
+        <div class="page-header">
+          <h1>AI Analyst <span class="powered-by">Powered by Claude</span></h1>
+        </div>
+        <div class="chat-layout">
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-welcome">
+              <div class="welcome-icon">🤖</div>
+              <h3>Claude AI Trading Analyst</h3>
+              <p>Ask me anything about your trades, strategies, or market concepts. I have access to your trade data and can provide personalized insights.</p>
+              <div class="suggestion-chips">
+                <button class="chip" onclick="sendSuggestion('What is my overall win rate?')">Win Rate</button>
+                <button class="chip" onclick="sendSuggestion('Which of my trades had the best return?')">Best Trade</button>
+                <button class="chip" onclick="sendSuggestion('Analyze my trading patterns and give me advice')">Analyze Patterns</button>
+                <button class="chip" onclick="sendSuggestion('What are my open positions?')">Open Positions</button>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <div id="apiKeyNotice" class="api-key-notice">
+              <span>⚠️ Set your Claude API key in <button onclick="showSettings()" class="link-btn">Settings</button> to use the AI chat</span>
+            </div>
+            <div class="chat-input-row">
+              <textarea id="chatInput" placeholder="Ask about your trades..." rows="1"></textarea>
+              <button id="sendBtn" class="btn-send">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
-        <div class="chat-input-area">
-          <div id="apiKeyNotice" class="api-key-notice">
-            <span>⚠️ Set your Claude API key in <button onclick="showSettings()" class="link-btn">Settings</button> to use the AI chat</span>
+      </section>
+
+      <!-- ── TRADING ── -->
+      <section id="tab-trading" class="tab">
+
+        <!-- No connection state -->
+        <div id="tradingNoConn" class="trading-no-conn">
+          <div style="font-size:52px;margin-bottom:16px">⚡</div>
+          <h2>Connect a Broker to Trade</h2>
+          <p>Link your Alpaca account to place trades, track positions, and manage orders directly from this app.</p>
+          <button class="btn-primary" style="margin-top:16px" onclick="showTab('brokers')">→ Go to Brokers</button>
+        </div>
+
+        <!-- Trading interface (shown when connected) -->
+        <div id="tradingInterface" class="hidden">
+
+          <!-- Top bar: account selector + stats + market status -->
+          <div class="trading-topbar">
+            <div class="trading-topbar-left">
+              <select id="tradingAccountSelect" class="trading-account-select"></select>
+              <span id="paperBadge" class="paper-badge hidden">PAPER</span>
+              <span id="marketStatus" class="market-status"></span>
+            </div>
+            <div class="trading-stats" id="tradingStats">
+              <div class="t-stat"><div class="t-stat-label">Portfolio</div><div class="t-stat-val" id="ts-equity">—</div></div>
+              <div class="t-stat-sep"></div>
+              <div class="t-stat"><div class="t-stat-label">Cash</div><div class="t-stat-val" id="ts-cash">—</div></div>
+              <div class="t-stat-sep"></div>
+              <div class="t-stat"><div class="t-stat-label">Buying Power</div><div class="t-stat-val" id="ts-bp">—</div></div>
+              <div class="t-stat-sep"></div>
+              <div class="t-stat"><div class="t-stat-label">Day P&amp;L</div><div class="t-stat-val" id="ts-daypnl">—</div></div>
+            </div>
+            <button class="btn-sm" id="refreshTradingBtn" title="Refresh data">↻ Refresh</button>
           </div>
-          <div class="chat-input-row">
-            <textarea id="chatInput" placeholder="Ask about your trades..." rows="1"></textarea>
-            <button id="sendBtn" class="btn-send">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
-              </svg>
-            </button>
+
+          <!-- Sub-navigation -->
+          <div class="trading-subnav">
+            <button class="t-nav-btn active" data-tview="positions">📋 Positions</button>
+            <button class="t-nav-btn" data-tview="orders">📜 Orders</button>
+            <button class="t-nav-btn" data-tview="trade">⚡ Place Trade</button>
+          </div>
+
+          <!-- POSITIONS VIEW -->
+          <div id="tview-positions" class="tview">
+            <div class="card" style="padding:0;overflow:hidden">
+              <div class="card-header" style="padding:14px 18px">
+                <h2>Open Positions</h2>
+                <span id="positionsCount" style="color:var(--text2);font-size:13px"></span>
+              </div>
+              <div class="trading-table-wrap">
+                <table class="trading-table">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Side</th>
+                      <th>Qty</th>
+                      <th>Avg Entry</th>
+                      <th>Current Price</th>
+                      <th>Market Value</th>
+                      <th>Unrealized P&amp;L</th>
+                      <th>Today %</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="positionsBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ORDERS VIEW -->
+          <div id="tview-orders" class="tview hidden">
+            <div class="card" style="padding:0;overflow:hidden">
+              <div class="card-header" style="padding:14px 18px">
+                <h2>Order History</h2>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <select id="orderStatusFilter" class="filter-select" onchange="filterOrders()">
+                    <option value="all">All Orders</option>
+                    <option value="open">Open / Pending</option>
+                    <option value="closed">Filled / Closed</option>
+                  </select>
+                </div>
+              </div>
+              <div class="trading-table-wrap">
+                <table class="trading-table">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Side</th>
+                      <th>Qty</th>
+                      <th>Filled</th>
+                      <th>Type</th>
+                      <th>Limit</th>
+                      <th>Stop</th>
+                      <th>Avg Fill</th>
+                      <th>Status</th>
+                      <th>Submitted</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ordersBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- PLACE TRADE VIEW -->
+          <div id="tview-trade" class="tview hidden">
+            <div class="trade-layout">
+
+              <!-- Order form -->
+              <div class="card trade-form-card">
+                <h2 style="margin-bottom:20px;font-size:16px">Place Order</h2>
+
+                <!-- Buy / Sell toggle -->
+                <div class="side-toggle">
+                  <button class="side-btn side-buy active" id="sideBuyBtn" onclick="setTradeSide('buy')">BUY</button>
+                  <button class="side-btn side-sell" id="sideSellBtn" onclick="setTradeSide('sell')">SELL</button>
+                </div>
+
+                <div class="trade-form-fields">
+                  <div class="form-group">
+                    <label>Symbol *</label>
+                    <input type="text" id="orderSymbol" placeholder="AAPL, TSLA, SPY..." style="text-transform:uppercase;font-weight:700;font-size:16px" />
+                  </div>
+                  <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="orderQty" placeholder="0" min="0.001" step="1" />
+                  </div>
+                  <div class="form-group">
+                    <label>Order Type</label>
+                    <select id="orderType" onchange="updateOrderFields()">
+                      <option value="market">Market</option>
+                      <option value="limit">Limit</option>
+                      <option value="stop">Stop</option>
+                      <option value="stop_limit">Stop-Limit</option>
+                      <option value="trailing_stop">Trailing Stop</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Time in Force</label>
+                    <select id="orderTIF">
+                      <option value="day">Day</option>
+                      <option value="gtc">Good Till Canceled</option>
+                      <option value="ioc">Immediate or Cancel</option>
+                      <option value="fok">Fill or Kill</option>
+                    </select>
+                  </div>
+                  <div class="form-group hidden" id="grp-limit">
+                    <label>Limit Price *</label>
+                    <input type="number" id="orderLimitPrice" placeholder="0.00" step="0.01" min="0" />
+                  </div>
+                  <div class="form-group hidden" id="grp-stop">
+                    <label>Stop Price *</label>
+                    <input type="number" id="orderStopPrice" placeholder="0.00" step="0.01" min="0" />
+                  </div>
+                  <div class="form-group hidden" id="grp-trail">
+                    <label>Trail Amount ($) *</label>
+                    <input type="number" id="orderTrailPrice" placeholder="e.g. 1.00" step="0.01" min="0" />
+                  </div>
+                </div>
+
+                <div id="tradeFormError" class="auth-error hidden" style="margin-top:12px"></div>
+                <button class="btn-primary" style="width:100%;margin-top:16px;padding:13px" id="previewOrderBtn" onclick="previewOrder()">
+                  Preview Order →
+                </button>
+              </div>
+
+              <!-- Live positions quick-ref -->
+              <div class="card trade-positions-ref">
+                <div class="card-header"><h2 style="font-size:14px">Your Positions</h2></div>
+                <div id="tradeViewPositions" class="trade-pos-list"></div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── BROKERS ── -->
+      <section id="tab-brokers" class="tab">
+        <div class="page-header">
+          <h1>Brokerage Integration</h1>
+        </div>
+        <p class="brokers-intro">Import trades from your brokerage. You control exactly which trades get added — nothing syncs automatically.</p>
+
+        <!-- Connected Alpaca accounts -->
+        <div id="alpacaConnectionSection">
+          <div class="section-label">Alpaca (API Integration)</div>
+          <div class="alpaca-connect-card card" id="alpacaConnectCard">
+            <div class="alpaca-card-left">
+              <div class="broker-logo-big">🦙</div>
+              <div>
+                <div class="broker-card-name">Alpaca Markets</div>
+                <div class="broker-card-sub">Real API connection — fetch live & paper trades directly</div>
+              </div>
+            </div>
+            <button class="btn-primary" id="openAlpacaFormBtn">+ Connect Alpaca</button>
+          </div>
+
+          <!-- Alpaca connection form (hidden until button clicked) -->
+          <div class="alpaca-form card hidden" id="alpacaForm">
+            <h3 style="margin-bottom:16px;font-size:15px">Connect Alpaca Account</h3>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>API Key ID</label>
+                <input type="text" id="alpacaKeyInput" placeholder="PKXXXXXXXXXXXXX" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label>API Secret Key</label>
+                <input type="password" id="alpacaSecretInput" placeholder="••••••••••••••••" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label>Label (optional)</label>
+                <input type="text" id="alpacaLabelInput" placeholder="My Alpaca Account" />
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:10px;padding-top:22px">
+                <input type="checkbox" id="alpacaPaperToggle" checked />
+                <label for="alpacaPaperToggle" style="margin:0;font-weight:normal">Paper trading account</label>
+              </div>
+            </div>
+            <div id="alpacaFormError" class="auth-error hidden" style="margin-top:12px"></div>
+            <div style="display:flex;gap:10px;margin-top:16px">
+              <button class="btn-secondary" id="cancelAlpacaForm">Cancel</button>
+              <button class="btn-primary" id="saveAlpacaBtn">Save Connection</button>
+            </div>
+          </div>
+
+          <!-- List of saved Alpaca connections -->
+          <div id="alpacaConnectionsList"></div>
+        </div>
+
+        <!-- CSV Import section -->
+        <div class="section-label" style="margin-top:28px">Import via CSV</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">
+          Most brokers let you export your trade history as a CSV file. Upload it here and choose which trades to import.
+        </p>
+        <div class="broker-cards-grid">
+          <div class="broker-card" onclick="openCsvImport('robinhood')">
+            <div class="broker-logo">🟢</div>
+            <div class="broker-card-name">Robinhood</div>
+            <div class="broker-card-hint">Account → Statements & History → Download</div>
+            <button class="btn-sm broker-csv-btn">Import CSV</button>
+          </div>
+          <div class="broker-card" onclick="openCsvImport('webull')">
+            <div class="broker-logo">🔵</div>
+            <div class="broker-card-name">Webull</div>
+            <div class="broker-card-hint">More → Orders → History → Export</div>
+            <button class="btn-sm broker-csv-btn">Import CSV</button>
+          </div>
+          <div class="broker-card" onclick="openCsvImport('td')">
+            <div class="broker-logo">🟠</div>
+            <div class="broker-card-name">TD / Schwab</div>
+            <div class="broker-card-hint">History → Export to Spreadsheet</div>
+            <button class="btn-sm broker-csv-btn">Import CSV</button>
+          </div>
+          <div class="broker-card" onclick="openCsvImport('ibkr')">
+            <div class="broker-logo">🔴</div>
+            <div class="broker-card-name">Interactive Brokers</div>
+            <div class="broker-card-hint">Reports → Activity → Trades → CSV</div>
+            <button class="btn-sm broker-csv-btn">Import CSV</button>
+          </div>
+          <div class="broker-card" onclick="openCsvImport('generic')">
+            <div class="broker-logo">📊</div>
+            <div class="broker-card-name">Other Broker</div>
+            <div class="broker-card-hint">Any CSV with symbol, price, date columns</div>
+            <button class="btn-sm broker-csv-btn">Import CSV</button>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-  </main>
+    </main>
+  </div>
 
   <!-- TRADE MODAL -->
   <div id="tradeModal" class="modal hidden">
@@ -362,6 +744,138 @@
         <button id="confirmCancel" class="btn-secondary">Cancel</button>
         <button id="confirmOk" class="btn-danger">Delete</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ORDER PREVIEW MODAL -->
+  <div id="orderPreviewModal" class="modal hidden">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-header">
+        <h2>Review Your Order</h2>
+        <button onclick="document.getElementById('orderPreviewModal').classList.add('hidden')">&times;</button>
+      </div>
+
+      <div class="order-action-banner" id="orderActionBanner">BUY</div>
+
+      <div class="order-preview-rows">
+        <div class="order-preview-row"><span>Symbol</span><strong id="prev-symbol">—</strong></div>
+        <div class="order-preview-row"><span>Side</span><strong id="prev-side">—</strong></div>
+        <div class="order-preview-row"><span>Quantity</span><strong id="prev-qty">—</strong></div>
+        <div class="order-preview-row"><span>Order Type</span><strong id="prev-type">—</strong></div>
+        <div class="order-preview-row hidden" id="prev-row-limit"><span>Limit Price</span><strong id="prev-limit">—</strong></div>
+        <div class="order-preview-row hidden" id="prev-row-stop"><span>Stop Price</span><strong id="prev-stop">—</strong></div>
+        <div class="order-preview-row hidden" id="prev-row-trail"><span>Trail Amount</span><strong id="prev-trail">—</strong></div>
+        <div class="order-preview-row"><span>Time in Force</span><strong id="prev-tif">—</strong></div>
+        <div class="order-preview-row"><span>Account</span><strong id="prev-account">—</strong></div>
+        <div class="order-preview-row" id="prev-row-est"><span>Est. Value</span><strong id="prev-est" style="color:var(--yellow)">Market price</strong></div>
+      </div>
+
+      <div class="order-disclaimer">
+        ⚠️ Orders execute at the next available market price and are not guaranteed.
+        By submitting, you authorize this order to be placed with your connected broker.
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="document.getElementById('orderPreviewModal').classList.add('hidden')">Cancel</button>
+        <button class="btn-primary" id="submitOrderBtn" onclick="submitOrder()">Confirm &amp; Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ORDER CONFIRMATION MODAL -->
+  <div id="orderConfirmModal" class="modal hidden">
+    <div class="modal-box small" style="text-align:center;padding:32px 28px">
+      <div id="orderConfirmIcon" style="font-size:48px;margin-bottom:12px">✅</div>
+      <h2 id="orderConfirmTitle" style="margin-bottom:8px">Order Submitted</h2>
+      <p id="orderConfirmMsg" style="color:var(--text2);font-size:13px;line-height:1.6"></p>
+      <div id="orderConfirmId" style="margin-top:12px;font-size:11px;color:var(--text2);font-family:monospace"></div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:24px">
+        <button class="btn-secondary" onclick="document.getElementById('orderConfirmModal').classList.add('hidden')">Close</button>
+        <button class="btn-primary" onclick="switchTradingView('orders');document.getElementById('orderConfirmModal').classList.add('hidden')">View Orders →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BROKER IMPORT MODAL -->
+  <div id="brokerImportModal" class="modal hidden">
+    <div class="modal-box import-modal-box">
+
+      <!-- Step 1: Upload -->
+      <div id="importStep1">
+        <div class="modal-header">
+          <div>
+            <h2 id="importModalTitle">Import Trades</h2>
+            <div class="import-broker-badge" id="importBrokerBadge"></div>
+          </div>
+          <button class="close-import-modal">&times;</button>
+        </div>
+        <div class="csv-instructions" id="csvInstructions"></div>
+        <div class="csv-drop-zone" id="csvDropZone">
+          <div class="csv-drop-inner">
+            <span style="font-size:36px">📂</span>
+            <p>Drop your CSV file here or <strong>click to browse</strong></p>
+            <small id="csvFormatHint">Supports Robinhood, Webull, TD Ameritrade, IBKR, and generic CSV</small>
+          </div>
+        </div>
+        <input type="file" id="csvFileInput" accept=".csv,.txt,text/csv" style="display:none" />
+        <div id="importStep1Error" class="auth-error hidden" style="margin-top:12px"></div>
+        <div class="import-step1-loading hidden" id="importStep1Loading">
+          <div class="loading-spinner"></div> Parsing CSV…
+        </div>
+      </div>
+
+      <!-- Step 2: Preview & select -->
+      <div id="importStep2" class="hidden">
+        <div class="modal-header">
+          <div>
+            <h2>Review & Select Trades</h2>
+            <small id="importSummaryText" style="color:var(--text2)"></small>
+          </div>
+          <button class="close-import-modal">&times;</button>
+        </div>
+        <div class="import-controls">
+          <label class="import-select-all">
+            <input type="checkbox" id="selectAllCheckbox" checked onchange="selectAllImport(this.checked)" />
+            Select all
+          </label>
+          <span id="selectedCount" class="selected-count">0 selected</span>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn-secondary" id="backToStep1Btn">← Back</button>
+            <button class="btn-primary" id="importSelectedBtn" disabled>Import 0 Trades</button>
+          </div>
+        </div>
+        <div class="import-table-wrap">
+          <table class="import-table">
+            <thead>
+              <tr>
+                <th style="width:36px"></th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Qty</th>
+                <th>P&amp;L</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th style="max-width:180px">Source</th>
+              </tr>
+            </thead>
+            <tbody id="importTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Step 3: Success -->
+      <div id="importStep3" class="hidden import-success">
+        <div style="font-size:52px">✅</div>
+        <h2 id="importSuccessMsg">Trades Imported!</h2>
+        <p style="color:var(--text2)">Your selected trades have been added to your tracker.</p>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+          <button class="btn-secondary close-import-modal">Close</button>
+          <button class="btn-primary" onclick="showTab('trades');closeImportModal()">View Trades →</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
