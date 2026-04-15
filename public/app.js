@@ -741,6 +741,7 @@ function setupEventListeners() {
     btn.addEventListener('click', () => {
       showTab(btn.dataset.tab);
       if (btn.dataset.tab === 'trading') initTradingTab();
+      if (btn.dataset.tab === 'news') initNewsTab();
     });
   });
 
@@ -879,6 +880,261 @@ function renderMyTradeSymbols() {
   chipsEl.innerHTML = uniqueSymbols.map(sym =>
     `<button class="sym-chip" data-sym="${sym}" onclick="document.getElementById('chartSymbolInput').value='${sym}';loadChart('${sym}')">${sym}</button>`
   ).join('');
+}
+
+// ── NEWS ─────────────────────────────────────────────────────────────────────
+
+let savedArticles = [];
+let activeNewstab  = 'market';
+let newsTickerFilter = '';
+
+async function initNewsTab() {
+  await loadSavedArticles();
+  switchNewstab('market');
+  loadMarketNews();
+  setupNewsListeners();
+}
+
+function setupNewsListeners() {
+  document.querySelectorAll('.news-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchNewstab(btn.dataset.newstab));
+  });
+  document.getElementById('newsSearchBtn').addEventListener('click', searchTickerNews);
+  document.getElementById('newsTickerInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') searchTickerNews();
+  });
+}
+
+function switchNewstab(tab) {
+  activeNewstab = tab;
+  document.querySelectorAll('.news-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.newstab === tab));
+  document.querySelectorAll('.news-pane').forEach(p => p.classList.add('hidden'));
+  document.getElementById(`newstab-${tab}`).classList.remove('hidden');
+
+  if (tab === 'mytickers') loadMyTickersNews();
+  if (tab === 'saved')     renderSavedArticles();
+}
+
+// ── Market news ───────────────────────────────────────────────────────────────
+
+async function loadMarketNews() {
+  const loadEl = document.getElementById('marketNewsLoading');
+  const feedEl = document.getElementById('marketNewsFeed');
+  if (loadEl) loadEl.style.display = 'flex';
+  try {
+    const res = await fetch('/api/news/market');
+    const articles = res.ok ? await res.json() : [];
+    if (loadEl) loadEl.style.display = 'none';
+    renderArticles(feedEl, articles, false);
+  } catch {
+    if (loadEl) loadEl.style.display = 'none';
+    feedEl.innerHTML = '<div class="news-empty"><p>Could not load news. Check your connection.</p></div>';
+  }
+}
+
+// ── Ticker search ─────────────────────────────────────────────────────────────
+
+async function searchTickerNews() {
+  const sym = document.getElementById('newsTickerInput').value.trim().toUpperCase();
+  if (!sym) return;
+  newsTickerFilter = sym;
+
+  // Switch to market tab and show loading
+  switchNewstab('market');
+  document.querySelectorAll('.news-tab-btn').forEach(b => b.classList.remove('active'));
+  const feedEl = document.getElementById('marketNewsFeed');
+  feedEl.innerHTML = `<div class="news-loading"><div class="loading-spinner"></div> Loading news for <strong>${escHtml(sym)}</strong>…</div>`;
+
+  try {
+    const res = await fetch(`/api/news/ticker/${encodeURIComponent(sym)}`);
+    const articles = res.ok ? await res.json() : [];
+    if (!articles.length) {
+      feedEl.innerHTML = `<div class="news-empty"><div style="font-size:36px;margin-bottom:10px">🔍</div><p>No news found for <strong>${escHtml(sym)}</strong>.</p><button class="btn-sm" style="margin-top:12px" onclick="loadMarketNews()">← Back to Market News</button></div>`;
+      return;
+    }
+    // Add a back button header
+    feedEl.innerHTML = `<div class="news-ticker-header"><span class="news-ticker-badge">${escHtml(sym)}</span><span>${articles.length} articles</span><button class="btn-sm" onclick="loadMarketNews();document.getElementById('newsTickerInput').value=''">✕ Clear</button></div>`;
+    renderArticles(feedEl, articles, false, true);
+  } catch {
+    feedEl.innerHTML = '<div class="news-empty"><p>Error loading news.</p></div>';
+  }
+}
+
+// ── My Tickers news ───────────────────────────────────────────────────────────
+
+async function loadMyTickersNews() {
+  const symbols = [...new Set(trades.map(t => t.symbol.toUpperCase()))];
+  const chipsEl = document.getElementById('myTickerChips');
+  const feedEl  = document.getElementById('myTickersFeed');
+  const emptyEl = document.getElementById('myTickersEmpty');
+
+  if (!symbols.length) {
+    emptyEl.classList.remove('hidden');
+    chipsEl.innerHTML = '';
+    feedEl.innerHTML  = '';
+    return;
+  }
+  emptyEl.classList.add('hidden');
+
+  chipsEl.innerHTML = symbols.map(s =>
+    `<button class="sym-chip" onclick="filterMyTickerNews('${s}')">${escHtml(s)}</button>`
+  ).join('');
+
+  feedEl.innerHTML = '<div class="news-loading"><div class="loading-spinner"></div> Loading news for your tickers…</div>';
+
+  try {
+    const res = await fetch('/api/news/tickers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbols })
+    });
+    const articles = res.ok ? await res.json() : [];
+    feedEl.innerHTML = '';
+    renderArticles(feedEl, articles, false);
+  } catch {
+    feedEl.innerHTML = '<div class="news-empty"><p>Error loading news.</p></div>';
+  }
+}
+
+function filterMyTickerNews(sym) {
+  document.querySelectorAll('#myTickerChips .sym-chip').forEach(b =>
+    b.classList.toggle('active', b.textContent === sym)
+  );
+  // Re-fetch just for this symbol
+  const feedEl = document.getElementById('myTickersFeed');
+  feedEl.innerHTML = `<div class="news-loading"><div class="loading-spinner"></div> Loading ${escHtml(sym)} news…</div>`;
+  fetch(`/api/news/ticker/${encodeURIComponent(sym)}`)
+    .then(r => r.ok ? r.json() : [])
+    .then(articles => { feedEl.innerHTML = ''; renderArticles(feedEl, articles, false); })
+    .catch(() => { feedEl.innerHTML = '<div class="news-empty"><p>Error.</p></div>'; });
+}
+
+// ── Render articles ───────────────────────────────────────────────────────────
+
+function renderArticles(container, articles, append = false) {
+  if (!append) {
+    const existing = container.querySelectorAll('.news-card');
+    existing.forEach(e => e.remove());
+  }
+  if (!articles.length) {
+    container.innerHTML += '<div class="news-empty"><p>No articles found.</p></div>';
+    return;
+  }
+  const savedLinks = new Set(savedArticles.map(a => a.link));
+  container.innerHTML += articles.map(a => {
+    const timeAgo   = formatTimeAgo(a.pubDate);
+    const isSaved   = savedLinks.has(a.link);
+    const symBadge  = a.symbol ? `<span class="news-sym-badge">${escHtml(a.symbol)}</span>` : '';
+    return `
+    <div class="news-card">
+      <div class="news-card-meta">
+        <span class="news-source">${escHtml(a.source || 'News')}</span>
+        ${symBadge}
+        <span class="news-time">${timeAgo}</span>
+      </div>
+      <div class="news-card-title">
+        <a href="${escHtml(a.link)}" target="_blank" rel="noopener">${escHtml(a.title)}</a>
+      </div>
+      ${a.description ? `<div class="news-card-desc">${escHtml(a.description)}</div>` : ''}
+      <div class="news-card-actions">
+        <button class="news-ask-btn" onclick='askAIAboutNews(${JSON.stringify(a.title)})'>🤖 Ask AI</button>
+        <button class="news-save-btn ${isSaved ? 'saved' : ''}" onclick='toggleSaveArticle(this, ${JSON.stringify(a)})'>
+          ${isSaved ? '🔖 Saved' : '🔖 Save'}
+        </button>
+        <a href="${escHtml(a.link)}" target="_blank" rel="noopener" class="news-read-btn">Read →</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Saved articles ────────────────────────────────────────────────────────────
+
+async function loadSavedArticles() {
+  try {
+    const res = await fetch('/api/news/saved');
+    savedArticles = res.ok ? await res.json() : [];
+  } catch { savedArticles = []; }
+}
+
+function renderSavedArticles() {
+  const feedEl  = document.getElementById('savedArticlesFeed');
+  const emptyEl = document.getElementById('savedEmpty');
+  feedEl.innerHTML = '';
+  if (!savedArticles.length) { emptyEl.classList.remove('hidden'); return; }
+  emptyEl.classList.add('hidden');
+  savedArticles.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)).forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'news-card';
+    div.innerHTML = `
+      <div class="news-card-meta">
+        <span class="news-source">${escHtml(a.source || 'News')}</span>
+        ${a.symbol ? `<span class="news-sym-badge">${escHtml(a.symbol)}</span>` : ''}
+        <span class="news-time">Saved ${formatTimeAgo(a.savedAt)}</span>
+      </div>
+      <div class="news-card-title"><a href="${escHtml(a.link)}" target="_blank" rel="noopener">${escHtml(a.title)}</a></div>
+      ${a.description ? `<div class="news-card-desc">${escHtml(a.description)}</div>` : ''}
+      <div class="news-card-actions">
+        <button class="news-ask-btn" onclick='askAIAboutNews(${JSON.stringify(a.title)})'>🤖 Ask AI</button>
+        <button class="news-save-btn saved" onclick="unsaveArticle('${a.id}', this)">🗑 Remove</button>
+        <a href="${escHtml(a.link)}" target="_blank" rel="noopener" class="news-read-btn">Read →</a>
+      </div>`;
+    feedEl.appendChild(div);
+  });
+}
+
+async function toggleSaveArticle(btn, article) {
+  const isSaved = btn.classList.contains('saved');
+  if (isSaved) {
+    const saved = savedArticles.find(a => a.link === article.link);
+    if (saved) await unsaveArticle(saved.id, btn);
+    return;
+  }
+  try {
+    const res = await fetch('/api/news/saved', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(article)
+    });
+    if (res.ok || res.status === 409) {
+      const data = res.ok ? await res.json() : null;
+      if (data) savedArticles.push(data);
+      btn.classList.add('saved');
+      btn.textContent = '🔖 Saved';
+    }
+  } catch { /* ignore */ }
+}
+
+async function unsaveArticle(id, btn) {
+  await fetch(`/api/news/saved/${id}`, { method: 'DELETE' });
+  savedArticles = savedArticles.filter(a => a.id !== id);
+  if (btn) { btn.classList.remove('saved'); btn.textContent = '🔖 Save'; }
+  if (activeNewstab === 'saved') renderSavedArticles();
+}
+
+// ── Ask AI about news ─────────────────────────────────────────────────────────
+
+function askAIAboutNews(headline) {
+  showTab('chat');
+  const msg = `I just saw this headline: "${headline}" — can you explain what this means for the markets and how it might affect my trades?`;
+  document.getElementById('chatInput').value = msg;
+  const welcomeEl = document.querySelector('.chat-welcome');
+  if (welcomeEl) welcomeEl.style.display = 'none';
+  sendMessage();
+}
+
+// ── Time helpers ──────────────────────────────────────────────────────────────
+
+function formatTimeAgo(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  const diff = Date.now() - d.getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins < 2)   return 'just now';
+  if (mins < 60)  return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7)   return `${days}d ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // ── TRADING ──────────────────────────────────────────────────────────────────

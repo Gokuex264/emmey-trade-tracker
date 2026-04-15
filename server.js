@@ -31,15 +31,63 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 
 function initData() {
   if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ users: [], trades: [], notebooks: [], notes: [], brokers: [] }, null, 2));
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ users: [], trades: [], notebooks: [], notes: [], brokers: [], savedArticles: [] }, null, 2));
   } else {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     let changed = false;
-    if (!d.users)     { d.users = []; changed = true; }
-    if (!d.notebooks) { d.notebooks = []; changed = true; }
-    if (!d.brokers)   { d.brokers = []; changed = true; }
+    if (!d.users)          { d.users = []; changed = true; }
+    if (!d.notebooks)      { d.notebooks = []; changed = true; }
+    if (!d.brokers)        { d.brokers = []; changed = true; }
+    if (!d.savedArticles)  { d.savedArticles = []; changed = true; }
     if (changed) fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2));
   }
+}
+
+// ── RSS NEWS ENGINE ───────────────────────────────────────────────────────────
+
+const newsCache = new Map();
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+function extractTag(xml, tag) {
+  const m = xml.match(new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?<\\/${tag}>`, 'i'));
+  return m ? m[1].trim() : '';
+}
+
+function stripHtml(str) {
+  return str.replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ')
+    .replace(/\s+/g,' ').trim().slice(0, 220);
+}
+
+function parseRSS(xml, sourceName) {
+  const items = [];
+  const itemRx = /<item[^>]*>([\s\S]*?)<\/item>/g;
+  let m;
+  while ((m = itemRx.exec(xml)) !== null) {
+    const chunk = m[1];
+    const title  = stripHtml(extractTag(chunk, 'title'));
+    const link   = extractTag(chunk, 'link') || extractTag(chunk, 'guid');
+    const pubDate= extractTag(chunk, 'pubDate') || extractTag(chunk, 'dc:date') || '';
+    const desc   = stripHtml(extractTag(chunk, 'description'));
+    if (title && link) items.push({ title, link, pubDate, description: desc, source: sourceName, id: Buffer.from(link).toString('base64').slice(0,16) });
+  }
+  return items;
+}
+
+async function fetchRSS(url, sourceName) {
+  const cached = newsCache.get(url);
+  if (cached && Date.now() - cached.time < CACHE_TTL) return cached.data;
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TradeTracker/1.0)' },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const items = parseRSS(xml, sourceName);
+    newsCache.set(url, { data: items, time: Date.now() });
+    return items;
+  } catch { return []; }
 }
 
 // ── CSV PARSING & BROKER NORMALIZATION ────────────────────────────────────────
@@ -420,6 +468,84 @@ app.delete('/api/notes/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ─── NEWS API ─────────────────────────────────────────────────────────────────
+
+const MARKET_FEEDS = [
+  { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?region=US&lang=en-US', name: 'Yahoo Finance' },
+  { url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html',                 name: 'CNBC' },
+  { url: 'https://www.cnbc.com/id/20910258/device/rss/rss.html',                  name: 'CNBC Economy' },
+  { url: 'https://feeds.marketwatch.com/marketwatch/marketpulse/',                name: 'MarketWatch' },
+];
+
+// General market news
+app.get('/api/news/market', requireAuth, async (req, res) => {
+  try {
+    const results = await Promise.all(MARKET_FEEDS.map(f => fetchRSS(f.url, f.name)));
+    const all = results.flat().sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    // deduplicate by id
+    const seen = new Set();
+    const deduped = all.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; });
+    res.json(deduped.slice(0, 60));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Ticker-specific news
+app.get('/api/news/ticker/:symbol', requireAuth, async (req, res) => {
+  const sym = req.params.symbol.toUpperCase().trim();
+  if (!sym) return res.status(400).json({ error: 'Symbol required' });
+  try {
+    const items = await fetchRSS(
+      `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(sym)}&region=US&lang=en-US`,
+      'Yahoo Finance'
+    );
+    res.json(items.slice(0, 30));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// News for multiple tickers at once (My Tickers)
+app.post('/api/news/tickers', requireAuth, async (req, res) => {
+  const { symbols } = req.body;
+  if (!Array.isArray(symbols) || !symbols.length) return res.json([]);
+  try {
+    const results = await Promise.all(
+      symbols.slice(0, 8).map(s =>
+        fetchRSS(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(s.toUpperCase())}&region=US&lang=en-US`, 'Yahoo Finance')
+          .then(items => items.map(i => ({ ...i, symbol: s.toUpperCase() })))
+      )
+    );
+    const all = results.flat().sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    const seen = new Set();
+    res.json(all.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; }).slice(0, 60));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Saved articles CRUD
+app.get('/api/news/saved', requireAuth, (req, res) => {
+  const data = readData();
+  res.json((data.savedArticles || []).filter(a => a.userId === req.session.userId));
+});
+
+app.post('/api/news/saved', requireAuth, (req, res) => {
+  const { title, link, description, source, pubDate, symbol } = req.body;
+  if (!title || !link) return res.status(400).json({ error: 'title and link required' });
+  const data = readData();
+  if (!data.savedArticles) data.savedArticles = [];
+  // prevent duplicates
+  if (data.savedArticles.find(a => a.link === link && a.userId === req.session.userId))
+    return res.status(409).json({ error: 'Already saved' });
+  const article = { id: uuidv4(), userId: req.session.userId, title, link, description: description || '', source: source || '', pubDate: pubDate || '', symbol: symbol || '', savedAt: new Date().toISOString() };
+  data.savedArticles.push(article);
+  writeData(data);
+  res.json(article);
+});
+
+app.delete('/api/news/saved/:id', requireAuth, (req, res) => {
+  const data = readData();
+  data.savedArticles = (data.savedArticles || []).filter(a => !(a.id === req.params.id && a.userId === req.session.userId));
+  writeData(data);
+  res.json({ success: true });
+});
+
 // ─── BROKERS API ──────────────────────────────────────────────────────────────
 
 app.get('/api/brokers', requireAuth, (req, res) => {
@@ -630,7 +756,24 @@ app.post('/api/chat', requireAuth, async (req, res) => {
       ).join('\n')
     : '\n\nNo trades recorded yet.';
 
-  const systemPrompt = `You are an expert trading analyst and coach. You help traders analyze their trades, identify patterns, improve their strategy, and answer questions about trading concepts.\n\nYou have access to the user's actual trade data:${tradeContext}\n\nWhen answering questions:\n- Reference specific trades by symbol when relevant\n- Calculate P&L, win rate, and other metrics when asked\n- Give actionable advice based on their actual trade history\n- Explain trading concepts clearly\n- Be direct and concise`;
+  const systemPrompt = `You are an expert trading analyst, market strategist, and financial news interpreter. You serve as the user's personal AI analyst inside their trade tracker app.
+
+You can help with:
+1. TRADE ANALYSIS — analyze the user's actual trades, calculate P&L, win rate, patterns, and give personalized coaching
+2. MARKET NEWS & EVENTS — explain market-moving news, earnings reports, Fed decisions, CPI/jobs data, geopolitical events and their market impact
+3. ECONOMIC CONCEPTS — explain macroeconomics: inflation, interest rates, yield curves, GDP, monetary policy, sector rotation, etc.
+4. STOCK/ASSET RESEARCH — discuss fundamentals, technicals, sector trends, and trading setups for any symbol
+5. STRATEGY & EDUCATION — explain trading strategies, risk management, options, futures, crypto concepts
+
+User's trade data:${tradeContext}
+
+Guidelines:
+- When analyzing trades, reference specific symbols and dates from the data above
+- For news/economic questions, give clear context on WHY it matters to markets and HOW it typically affects prices
+- Always clarify if information may be outdated (your training data has a cutoff)
+- Be direct, specific, and actionable — avoid generic advice
+- Use plain language; avoid unnecessary jargon unless the user seems advanced
+- Format responses with headers and bullets when covering multiple points`;
 
   try {
     const client = new Anthropic({ apiKey });

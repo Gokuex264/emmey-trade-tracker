@@ -78,6 +78,9 @@
         <button class="nav-btn" data-tab="charts">
           <span>📉</span> Charts
         </button>
+        <button class="nav-btn" data-tab="news">
+          <span>📰</span> News
+        </button>
         <button class="nav-btn" data-tab="chat">
           <span>🤖</span> AI Analyst
         </button>
@@ -254,6 +257,9 @@
                   <button class="toolbar-btn" title="Italic" onclick="fmt('italic')"><i>I</i></button>
                   <button class="toolbar-btn" title="Underline" onclick="fmt('underline')"><u>U</u></button>
                   <div class="toolbar-sep"></div>
+                  <button class="toolbar-btn" title="Undo" onclick="fmt('undo')">↩ Undo</button>
+                  <button class="toolbar-btn" title="Redo" onclick="fmt('redo')">↪ Redo</button>
+                  <div class="toolbar-sep"></div>
                   <button class="toolbar-btn" title="Insert Photo" onclick="triggerImageUpload()">📷 Insert Photo</button>
                   <input type="file" id="imageFileInput" accept="image/*" style="display:none" />
                   <div class="toolbar-sep"></div>
@@ -330,6 +336,53 @@
         </div>
       </section>
 
+      <!-- ── NEWS ── -->
+      <section id="tab-news" class="tab">
+        <div class="page-header">
+          <h1>Market News</h1>
+          <div class="news-search-row">
+            <input type="text" id="newsTickerInput" placeholder="Search by ticker: AAPL, TSLA..." />
+            <button class="btn-primary" id="newsSearchBtn">Search</button>
+          </div>
+        </div>
+
+        <!-- Sub-tabs -->
+        <div class="news-subnav">
+          <button class="news-tab-btn active" data-newstab="market">📈 Market News</button>
+          <button class="news-tab-btn" data-newstab="mytickers">⭐ My Tickers</button>
+          <button class="news-tab-btn" data-newstab="saved">🔖 Saved</button>
+        </div>
+
+        <!-- Market News -->
+        <div id="newstab-market" class="news-pane">
+          <div id="marketNewsFeed" class="news-feed">
+            <div class="news-loading" id="marketNewsLoading">
+              <div class="loading-spinner"></div> Loading market news…
+            </div>
+          </div>
+        </div>
+
+        <!-- My Tickers -->
+        <div id="newstab-mytickers" class="news-pane hidden">
+          <div id="myTickersEmpty" class="news-empty hidden">
+            <div style="font-size:40px;margin-bottom:12px">📊</div>
+            <p>Add trades to your tracker to see news for your symbols here.</p>
+          </div>
+          <div class="my-tickers-chips" id="myTickerChips"></div>
+          <div id="myTickersFeed" class="news-feed"></div>
+        </div>
+
+        <!-- Saved Articles -->
+        <div id="newstab-saved" class="news-pane hidden">
+          <div id="savedArticlesFeed" class="news-feed">
+            <div class="news-empty" id="savedEmpty">
+              <div style="font-size:40px;margin-bottom:12px">🔖</div>
+              <p>Bookmark articles to read later. Click the bookmark icon on any article.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ── AI CHAT ── -->
       <section id="tab-chat" class="tab">
         <div class="page-header">
@@ -342,9 +395,11 @@
               <h3>Claude AI Trading Analyst</h3>
               <p>Ask me anything about your trades, strategies, or market concepts. I have access to your trade data and can provide personalized insights.</p>
               <div class="suggestion-chips">
-                <button class="chip" onclick="sendSuggestion('What is my overall win rate?')">Win Rate</button>
-                <button class="chip" onclick="sendSuggestion('Which of my trades had the best return?')">Best Trade</button>
-                <button class="chip" onclick="sendSuggestion('Analyze my trading patterns and give me advice')">Analyze Patterns</button>
+                <button class="chip" onclick="sendSuggestion('What is my overall win rate and total P&L?')">Win Rate</button>
+                <button class="chip" onclick="sendSuggestion('Analyze my trading patterns and give me actionable advice')">Analyze Patterns</button>
+                <button class="chip" onclick="sendSuggestion('How does the Federal Reserve interest rate policy affect the stock market?')">Fed &amp; Rates</button>
+                <button class="chip" onclick="sendSuggestion('What economic indicators should I watch as a trader?')">Key Indicators</button>
+                <button class="chip" onclick="sendSuggestion('Explain how inflation data like CPI affects markets')">Inflation Impact</button>
                 <button class="chip" onclick="sendSuggestion('What are my open positions?')">Open Positions</button>
               </div>
             </div>
