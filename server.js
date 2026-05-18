@@ -25,7 +25,7 @@ const upload = multer({
 const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
@@ -319,23 +319,52 @@ function requireAuth(req, res, next) {
 // ── AUTH ROUTES ───────────────────────────────────────────────────────────────
 
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, email } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  if (!email) return res.status(400).json({ error: 'Email is required' });
   if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
+  const normalizedEmail = email.trim().toLowerCase();
   const data = readData();
-  const exists = data.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-  if (exists) return res.status(400).json({ error: 'Username already taken' });
+  if (data.users.find(u => u.username.toLowerCase() === username.toLowerCase()))
+    return res.status(400).json({ error: 'Username already taken' });
+  if (data.users.find(u => u.email === normalizedEmail))
+    return res.status(400).json({ error: 'An account with that email already exists' });
 
   const hash = await bcrypt.hash(password, 10);
-  const user = { id: uuidv4(), username, passwordHash: hash, createdAt: new Date().toISOString() };
+  const user = { id: uuidv4(), username, email: normalizedEmail, passwordHash: hash, createdAt: new Date().toISOString() };
   data.users.push(user);
   writeData(data);
 
   req.session.userId = user.id;
   req.session.username = user.username;
   res.json({ id: user.id, username: user.username });
+});
+
+app.post('/api/forgot-password', (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const data = readData();
+  const user = data.users.find(u => u.email === email.trim().toLowerCase());
+  if (!user) return res.status(404).json({ error: 'No account found with that email address' });
+
+  res.json({ username: user.username });
+});
+
+app.post('/api/reset-password', async (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword) return res.status(400).json({ error: 'Email and new password are required' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  const data = readData();
+  const user = data.users.find(u => u.email === email.trim().toLowerCase());
+  if (!user) return res.status(404).json({ error: 'No account found with that email address' });
+
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  writeData(data);
+  res.json({ success: true });
 });
 
 app.post('/api/login', async (req, res) => {
@@ -544,6 +573,36 @@ app.delete('/api/news/saved/:id', requireAuth, (req, res) => {
   data.savedArticles = (data.savedArticles || []).filter(a => !(a.id === req.params.id && a.userId === req.session.userId));
   writeData(data);
   res.json({ success: true });
+});
+
+// ─── OPTIONS CHAIN PROXY ─────────────────────────────────────────────────────
+
+app.get('/api/options-chain', requireAuth, async (req, res) => {
+  const { ticker, date } = req.query;
+  if (!ticker) return res.status(400).json({ error: 'Ticker required' });
+  const symbol = ticker.trim().toUpperCase();
+  const url = date
+    ? `https://query1.finance.yahoo.com/v7/finance/options/${symbol}?date=${date}`
+    : `https://query1.finance.yahoo.com/v7/finance/options/${symbol}`;
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TradeTracker/1.0)' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!r.ok) return res.status(r.status).json({ error: `Yahoo Finance returned ${r.status}` });
+    const data = await r.json();
+    const result = data?.optionChain?.result?.[0];
+    if (!result) return res.status(404).json({ error: 'No options data found for that ticker' });
+    res.json({
+      symbol:          result.underlyingSymbol,
+      price:           result.quote?.regularMarketPrice,
+      expirationDates: result.expirationDates || [],
+      calls:           result.options?.[0]?.calls || [],
+      puts:            result.options?.[0]?.puts  || [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch options data: ' + err.message });
+  }
 });
 
 // ─── BROKERS API ──────────────────────────────────────────────────────────────
@@ -801,6 +860,6 @@ Guidelines:
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✅ Trade Tracker running at http://localhost:${PORT}\n`);
 });

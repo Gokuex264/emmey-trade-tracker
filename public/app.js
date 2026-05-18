@@ -1,3 +1,8 @@
+// ── SERVICE WORKER ──────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+}
+
 // ── STATE ──────────────────────────────────────────────────────────────────
 let trades = [];
 let notebooks = [];
@@ -104,9 +109,10 @@ function setupAuthListeners() {
   document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('regUsername').value.trim();
+    const email    = document.getElementById('regEmail').value.trim().toLowerCase();
     const password = document.getElementById('regPassword').value;
-    const confirm = document.getElementById('regConfirm').value;
-    const errEl = document.getElementById('registerError');
+    const confirm  = document.getElementById('regConfirm').value;
+    const errEl    = document.getElementById('registerError');
     errEl.classList.add('hidden');
 
     if (password !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.classList.remove('hidden'); return; }
@@ -115,13 +121,87 @@ function setupAuthListeners() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, email, password })
       });
       const data = await res.json();
       if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
       showApp(data);
     } catch { errEl.textContent = 'Network error. Try again.'; errEl.classList.remove('hidden'); }
   });
+}
+
+// ── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+function showForgotForm() {
+  document.getElementById('loginForm').classList.add('hidden');
+  document.getElementById('registerForm').classList.add('hidden');
+  document.getElementById('forgotForm').classList.remove('hidden');
+  document.getElementById('forgotStep1').classList.remove('hidden');
+  document.getElementById('forgotStep2').classList.add('hidden');
+  document.getElementById('forgotError').classList.add('hidden');
+  document.getElementById('forgotEmail').value = '';
+  document.getElementById('loginTabBtn').classList.remove('active');
+  document.getElementById('registerTabBtn').classList.remove('active');
+}
+
+function showLoginForm() {
+  document.getElementById('forgotForm').classList.add('hidden');
+  document.getElementById('loginForm').classList.remove('hidden');
+  document.getElementById('loginTabBtn').classList.add('active');
+  document.getElementById('registerTabBtn').classList.remove('active');
+}
+
+async function submitForgotEmail() {
+  const email  = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  const errEl  = document.getElementById('forgotError');
+  errEl.classList.add('hidden');
+
+  if (!email) { errEl.textContent = 'Please enter your email address.'; errEl.classList.remove('hidden'); return; }
+
+  try {
+    const res  = await fetch('/api/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
+
+    document.getElementById('recoveredUsername').textContent = data.username;
+    document.getElementById('forgotStep1').classList.add('hidden');
+    document.getElementById('forgotStep2').classList.remove('hidden');
+    document.getElementById('newPassword').value = '';
+    document.getElementById('newPasswordConfirm').value = '';
+    document.getElementById('resetError').classList.add('hidden');
+    document.getElementById('resetSuccess').classList.add('hidden');
+  } catch { errEl.textContent = 'Network error. Try again.'; errEl.classList.remove('hidden'); }
+}
+
+async function submitResetPassword() {
+  const email    = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  const newPw    = document.getElementById('newPassword').value;
+  const confirm  = document.getElementById('newPasswordConfirm').value;
+  const errEl    = document.getElementById('resetError');
+  const succEl   = document.getElementById('resetSuccess');
+  errEl.classList.add('hidden');
+  succEl.classList.add('hidden');
+
+  if (!newPw) { errEl.textContent = 'Please enter a new password.'; errEl.classList.remove('hidden'); return; }
+  if (newPw.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.classList.remove('hidden'); return; }
+  if (newPw !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.classList.remove('hidden'); return; }
+
+  try {
+    const res  = await fetch('/api/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, newPassword: newPw })
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
+
+    succEl.textContent = 'Password reset! Redirecting to login…';
+    succEl.classList.remove('hidden');
+    setTimeout(() => showLoginForm(), 1800);
+  } catch { errEl.textContent = 'Network error. Try again.'; errEl.classList.remove('hidden'); }
 }
 
 async function logout() {
@@ -1782,4 +1862,268 @@ function escHtml(str) {
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── OPTIONS CALCULATOR ───────────────────────────────────────────────────────
+
+let optType      = 'call';
+let chainData    = { calls: [], puts: [] };
+let chainSide    = 'calls';
+let chainExpiries = [];
+let chainPrice   = null;
+let activeTicker = '';
+
+// ── CHAIN LOOKUP ─────────────────────────────────────────────────────────────
+
+async function loadChain(dateTs) {
+  const ticker = document.getElementById('chainTicker').value.trim().toUpperCase();
+  if (!ticker) { setChainStatus('Enter a ticker first.', 'error'); return; }
+  activeTicker = ticker;
+
+  setChainStatus('Loading…', '');
+  document.getElementById('chainExpiries').classList.add('hidden');
+  document.getElementById('chainTableWrap').classList.add('hidden');
+
+  const url = dateTs
+    ? `/api/options-chain?ticker=${ticker}&date=${dateTs}`
+    : `/api/options-chain?ticker=${ticker}`;
+
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) { setChainStatus(data.error || 'Failed to load chain.', 'error'); return; }
+
+    chainPrice     = data.price;
+    chainData      = { calls: data.calls, puts: data.puts };
+    chainExpiries  = data.expirationDates || [];
+
+    setChainStatus(
+      `${data.symbol} — Current price: <strong>$${chainPrice?.toFixed(2) ?? '—'}</strong>`,
+      'ok'
+    );
+
+    renderExpTabs(dateTs);
+    renderChainTable();
+    document.getElementById('chainExpiries').classList.remove('hidden');
+    document.getElementById('chainTableWrap').classList.remove('hidden');
+  } catch (e) {
+    setChainStatus('Network error: ' + e.message, 'error');
+  }
+}
+
+function setChainStatus(msg, type) {
+  const el = document.getElementById('chainStatus');
+  el.innerHTML = msg;
+  el.style.color = type === 'error' ? 'var(--red)' : type === 'ok' ? 'var(--green)' : 'var(--text2)';
+}
+
+function renderExpTabs(activeTs) {
+  const wrap = document.getElementById('chainExpTabs');
+  wrap.innerHTML = '';
+  chainExpiries.forEach(ts => {
+    const d   = new Date(ts * 1000);
+    const lbl = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const btn = document.createElement('button');
+    btn.textContent = lbl;
+    btn.className   = 'exp-tab-btn' + (ts === activeTs || (!activeTs && ts === chainExpiries[0]) ? ' active' : '');
+    btn.onclick     = () => loadChain(ts);
+    wrap.appendChild(btn);
+  });
+}
+
+function showChainSide(side) {
+  chainSide = side;
+  document.getElementById('chainCallsBtn').classList.toggle('active', side === 'calls');
+  document.getElementById('chainPutsBtn').classList.toggle('active', side === 'puts');
+  renderChainTable();
+}
+
+function renderChainTable() {
+  const contracts = chainData[chainSide] || [];
+  const head = document.getElementById('chainTableHead');
+  const body = document.getElementById('chainTableBody');
+
+  head.innerHTML = `
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">Strike</th>
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">Bid</th>
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">Ask</th>
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">Last</th>
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">IV %</th>
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">Volume</th>
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">OI</th>
+    <th style="padding:8px 10px;text-align:left;background:var(--bg3);color:var(--accent)">ITM</th>`;
+
+  body.innerHTML = '';
+  if (!contracts.length) {
+    body.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text2)">No contracts found.</td></tr>`;
+    return;
+  }
+
+  contracts.forEach(c => {
+    const iv     = c.impliedVolatility != null ? (c.impliedVolatility * 100).toFixed(1) : '—';
+    const mid    = (c.bid && c.ask) ? ((c.bid + c.ask) / 2).toFixed(2) : (c.lastPrice?.toFixed(2) ?? '—');
+    const dte    = c.expiration ? Math.max(0, Math.round((c.expiration * 1000 - Date.now()) / 86400000)) : null;
+    const itm    = c.inTheMoney;
+
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.style.borderBottom = '1px solid var(--border)';
+    if (itm) tr.style.background = chainSide === 'calls' ? 'rgba(63,185,80,0.06)' : 'rgba(218,54,51,0.06)';
+
+    tr.innerHTML = `
+      <td style="padding:8px 10px;font-weight:700">$${c.strike?.toFixed(2) ?? '—'}</td>
+      <td style="padding:8px 10px">${c.bid?.toFixed(2) ?? '—'}</td>
+      <td style="padding:8px 10px">${c.ask?.toFixed(2) ?? '—'}</td>
+      <td style="padding:8px 10px">${c.lastPrice?.toFixed(2) ?? '—'}</td>
+      <td style="padding:8px 10px">${iv}%</td>
+      <td style="padding:8px 10px">${c.volume?.toLocaleString() ?? '—'}</td>
+      <td style="padding:8px 10px">${c.openInterest?.toLocaleString() ?? '—'}</td>
+      <td style="padding:8px 10px">${itm ? '<span style="color:var(--green);font-weight:600">✓</span>' : '<span style="color:var(--text2)">—</span>'}</td>`;
+
+    tr.onmouseenter = () => { if (!itm) tr.style.background = 'var(--bg3)'; };
+    tr.onmouseleave = () => { tr.style.background = itm ? (chainSide === 'calls' ? 'rgba(63,185,80,0.06)' : 'rgba(218,54,51,0.06)') : ''; };
+
+    tr.onclick = () => fillFromContract(c, chainSide === 'calls' ? 'call' : 'put', mid, dte);
+    body.appendChild(tr);
+  });
+}
+
+function fillFromContract(c, type, mid, dte) {
+  setOptType(type);
+  if (chainPrice)  document.getElementById('optS').value   = chainPrice.toFixed(2);
+  if (c.strike)    document.getElementById('optK').value   = c.strike.toFixed(2);
+  if (dte != null) document.getElementById('optDTE').value = dte;
+  if (c.impliedVolatility) document.getElementById('optIV').value = (c.impliedVolatility * 100).toFixed(1);
+  if (mid && mid !== '—') document.getElementById('optPremium').value = mid;
+  calcOptions();
+
+  // Scroll down to calculator
+  document.getElementById('optS').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('optS').closest('.card').style.outline = '2px solid var(--blue)';
+  setTimeout(() => { document.getElementById('optS').closest('.card').style.outline = ''; }, 1500);
+}
+
+function setOptType(type) {
+  optType = type;
+  document.getElementById('optCallBtn').classList.toggle('active', type === 'call');
+  document.getElementById('optPutBtn').classList.toggle('active', type === 'put');
+  calcOptions();
+}
+
+function normCDF(x) {
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return 0.5 * (1 + sign * y);
+}
+
+function normPDF(x) {
+  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+}
+
+function blackScholes(S, K, T, r, sigma, type) {
+  if (T <= 0) {
+    const intrinsic = type === 'call' ? Math.max(0, S - K) : Math.max(0, K - S);
+    return { price: intrinsic, delta: type === 'call' ? (S > K ? 1 : 0) : (S < K ? -1 : 0), gamma: 0, theta: 0, vega: 0, rho: 0 };
+  }
+  const sqrtT = Math.sqrt(T);
+  const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT);
+  const d2 = d1 - sigma * sqrtT;
+  const df  = Math.exp(-r * T);
+
+  let price, delta, rho;
+  if (type === 'call') {
+    price = S * normCDF(d1) - K * df * normCDF(d2);
+    delta = normCDF(d1);
+    rho   = K * T * df * normCDF(d2) / 100;
+  } else {
+    price = K * df * normCDF(-d2) - S * normCDF(-d1);
+    delta = normCDF(d1) - 1;
+    rho   = -K * T * df * normCDF(-d2) / 100;
+  }
+  const gamma = normPDF(d1) / (S * sigma * sqrtT);
+  const thetaRaw = type === 'call'
+    ? -(S * normPDF(d1) * sigma) / (2 * sqrtT) - r * K * df * normCDF(d2)
+    : -(S * normPDF(d1) * sigma) / (2 * sqrtT) + r * K * df * normCDF(-d2);
+  const theta = thetaRaw / 365;
+  const vega  = S * normPDF(d1) * sqrtT / 100;
+
+  return { price, delta, gamma, theta, vega, rho };
+}
+
+function calcOptions() {
+  const S        = parseFloat(document.getElementById('optS').value);
+  const K        = parseFloat(document.getElementById('optK').value);
+  const DTE      = parseFloat(document.getElementById('optDTE').value);
+  const ivPct    = parseFloat(document.getElementById('optIV').value);
+  const rPct     = parseFloat(document.getElementById('optR').value);
+  const contracts= parseInt(document.getElementById('optContracts').value) || 1;
+  const premiumEl= document.getElementById('optPremium').value;
+  const premium  = premiumEl !== '' ? parseFloat(premiumEl) : null;
+
+  const set = (id, val) => { document.getElementById(id).textContent = val; };
+
+  if ([S, K, DTE, ivPct, rPct].some(v => isNaN(v) || v < 0)) {
+    ['optPrice','optBreakeven','optIntrinsic','optTimeVal','optDelta','optGamma','optTheta','optVega','optRho','optMoneyness'].forEach(id => set(id, '—'));
+    document.getElementById('optPnlCard').style.display = 'none';
+    return;
+  }
+
+  const T     = DTE / 365;
+  const sigma = ivPct / 100;
+  const r     = rPct / 100;
+
+  const res = blackScholes(S, K, T, r, sigma, optType);
+
+  const intrinsic = optType === 'call' ? Math.max(0, S - K) : Math.max(0, K - S);
+  const timeVal   = Math.max(0, res.price - intrinsic);
+  const breakeven = optType === 'call' ? K + res.price : K - res.price;
+
+  const moneyness = S === K ? 'ATM'
+    : (optType === 'call' ? (S > K ? 'ITM' : 'OTM') : (S < K ? 'ITM' : 'OTM'));
+
+  set('optPrice',     '$' + res.price.toFixed(2));
+  set('optBreakeven', '$' + breakeven.toFixed(2));
+  set('optIntrinsic', '$' + intrinsic.toFixed(2));
+  set('optTimeVal',   '$' + timeVal.toFixed(2));
+  set('optDelta',     res.delta.toFixed(4));
+  set('optGamma',     res.gamma.toFixed(4));
+  set('optTheta',     res.theta.toFixed(4));
+  set('optVega',      res.vega.toFixed(4));
+  set('optRho',       res.rho.toFixed(4));
+  set('optMoneyness', moneyness);
+
+  document.getElementById('optDelta').style.color = res.delta >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // P&L table — only show when premium is provided
+  const pnlCard = document.getElementById('optPnlCard');
+  if (premium === null || isNaN(premium)) { pnlCard.style.display = 'none'; return; }
+
+  pnlCard.style.display = '';
+  const tbody = document.getElementById('optPnlBody');
+  tbody.innerHTML = '';
+
+  const step = S * 0.05;
+  const prices = [];
+  for (let p = Math.max(0.01, S - step * 5); p <= S + step * 5 + 0.001; p += step) {
+    prices.push(parseFloat(p.toFixed(2)));
+  }
+
+  prices.forEach(price => {
+    const optVal  = optType === 'call' ? Math.max(0, price - K) : Math.max(0, K - price);
+    const pnlPer  = (optVal - premium) * 100;          // per contract
+    const pnlTot  = pnlPer * contracts;
+    const isBreak = Math.abs(price - breakeven) < step * 0.5;
+
+    const tr = document.createElement('tr');
+    if (isBreak) tr.classList.add('pnl-be');
+    const pnlClass = pnlTot >= 0 ? 'pnl-pos' : 'pnl-neg';
+    tr.innerHTML = `
+      <td>$${price.toFixed(2)}${isBreak ? ' <span style="font-size:10px;color:var(--yellow)">≈ B/E</span>' : ''}</td>
+      <td>$${optVal.toFixed(2)}</td>
+      <td class="${pnlClass}">${pnlTot >= 0 ? '+' : ''}$${pnlPer.toFixed(2)}</td>
+      <td class="${pnlClass}">${pnlTot >= 0 ? '+' : ''}$${pnlTot.toFixed(2)}</td>`;
+    tbody.appendChild(tr);
+  });
 }

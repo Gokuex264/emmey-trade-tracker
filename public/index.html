@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Trade Tracker</title>
+  <title>TradeTracker</title>
+  <meta name="theme-color" content="#238636" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TradeTracker" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -34,6 +40,7 @@
         </div>
         <div id="loginError" class="auth-error hidden"></div>
         <button type="submit" class="btn-primary full-width">Log In</button>
+        <button type="button" class="btn-link" style="margin-top:10px;width:100%;text-align:center;background:none;border:none;color:#7eb8ff;cursor:pointer;font-size:0.82rem" onclick="showForgotForm()">Forgot username or password?</button>
       </form>
 
       <!-- Register Form -->
@@ -41,6 +48,10 @@
         <div class="form-group">
           <label>Username</label>
           <input type="text" id="regUsername" placeholder="Choose a username (min 3 chars)" autocomplete="username" required />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="regEmail" placeholder="you@example.com" autocomplete="email" required />
         </div>
         <div class="form-group">
           <label>Password</label>
@@ -53,6 +64,39 @@
         <div id="registerError" class="auth-error hidden"></div>
         <button type="submit" class="btn-primary full-width">Create Account</button>
       </form>
+
+      <!-- Forgot Password Form -->
+      <div id="forgotForm" class="auth-form hidden">
+        <!-- Step 1: enter email -->
+        <div id="forgotStep1">
+          <p style="font-size:0.85rem;color:#aab;margin-bottom:14px">Enter the email you registered with and we'll show your username and let you reset your password.</p>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="forgotEmail" placeholder="you@example.com" autocomplete="email" />
+          </div>
+          <div id="forgotError" class="auth-error hidden"></div>
+          <button class="btn-primary full-width" onclick="submitForgotEmail()">Look Up Account</button>
+        </div>
+        <!-- Step 2: reset password -->
+        <div id="forgotStep2" class="hidden">
+          <div id="forgotUsernameDisplay" style="background:#1e2535;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:0.9rem;color:#e0e6f0">
+            Your username: <strong id="recoveredUsername"></strong>
+          </div>
+          <div class="form-group">
+            <label>New Password</label>
+            <input type="password" id="newPassword" placeholder="Choose a new password (min 6 chars)" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label>Confirm New Password</label>
+            <input type="password" id="newPasswordConfirm" placeholder="Repeat your new password" autocomplete="new-password" />
+          </div>
+          <div id="resetError" class="auth-error hidden"></div>
+          <div id="resetSuccess" class="hidden" style="color:#3ddc84;font-size:0.85rem;margin-bottom:12px;text-align:center"></div>
+          <button class="btn-primary full-width" onclick="submitResetPassword()">Reset Password</button>
+        </div>
+        <button class="btn-link" style="margin-top:14px;width:100%;text-align:center;background:none;border:none;color:#7eb8ff;cursor:pointer;font-size:0.85rem" onclick="showLoginForm()">← Back to Login</button>
+      </div>
+
     </div>
   </div>
 
@@ -89,6 +133,9 @@
         </button>
         <button class="nav-btn" data-tab="trading">
           <span>⚡</span> Trading
+        </button>
+        <button class="nav-btn" data-tab="options">
+          <span>🧮</span> Options Calc
         </button>
       </nav>
       <div class="sidebar-footer">
@@ -686,6 +733,160 @@
             <div class="broker-card-name">Other Broker</div>
             <div class="broker-card-hint">Any CSV with symbol, price, date columns</div>
             <button class="btn-sm broker-csv-btn">Import CSV</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── OPTIONS CALCULATOR ── -->
+      <section id="tab-options" class="tab">
+        <div class="page-header">
+          <h1>Options Calculator</h1>
+          <span style="color:var(--text2);font-size:13px">Black-Scholes pricing model</span>
+        </div>
+
+        <!-- ── CHAIN LOOKUP ── -->
+        <div class="card" style="margin-bottom:20px">
+          <h2 style="font-size:15px;color:var(--accent);margin-bottom:14px">Look Up Options Chain</h2>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin:0;flex:1;min-width:140px">
+              <label>Stock Ticker</label>
+              <input type="text" id="chainTicker" placeholder="AAPL, TSLA, SPY…" style="text-transform:uppercase" />
+            </div>
+            <button class="btn-primary" onclick="loadChain()" style="height:38px;padding:0 20px">Load Chain</button>
+          </div>
+          <div id="chainStatus" style="margin-top:10px;font-size:13px;color:var(--text2)"></div>
+
+          <!-- expiration tabs -->
+          <div id="chainExpiries" class="hidden" style="margin-top:14px">
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">Expiration Date</label>
+            <div id="chainExpTabs" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+
+          <!-- call/put toggle + table -->
+          <div id="chainTableWrap" class="hidden" style="margin-top:16px">
+            <div style="display:flex;gap:0;margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content">
+              <button id="chainCallsBtn" class="opt-type-btn active" onclick="showChainSide('calls')">Calls</button>
+              <button id="chainPutsBtn"  class="opt-type-btn"        onclick="showChainSide('puts')">Puts</button>
+            </div>
+            <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Click a row to load it into the calculator below.</p>
+            <div style="overflow-x:auto">
+              <table id="chainTable" style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead>
+                  <tr id="chainTableHead"></tr>
+                </thead>
+                <tbody id="chainTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="options-layout">
+          <!-- ── INPUTS ── -->
+          <div class="card options-inputs-card">
+            <h2 style="margin-bottom:18px;font-size:15px;color:var(--accent)">Inputs</h2>
+
+            <div class="opt-type-toggle">
+              <button id="optCallBtn" class="opt-type-btn active" onclick="setOptType('call')">Call</button>
+              <button id="optPutBtn"  class="opt-type-btn"        onclick="setOptType('put')">Put</button>
+            </div>
+
+            <div class="form-group" style="margin-top:18px">
+              <label>Underlying Price ($)</label>
+              <input type="number" id="optS" step="0.01" placeholder="e.g. 185.00" oninput="calcOptions()" />
+            </div>
+            <div class="form-group">
+              <label>Strike Price ($)</label>
+              <input type="number" id="optK" step="0.01" placeholder="e.g. 190.00" oninput="calcOptions()" />
+            </div>
+            <div class="form-group">
+              <label>Days to Expiration</label>
+              <input type="number" id="optDTE" step="1" min="0" placeholder="e.g. 30" oninput="calcOptions()" />
+            </div>
+            <div class="form-group">
+              <label>Implied Volatility (%)</label>
+              <input type="number" id="optIV" step="0.1" placeholder="e.g. 25" oninput="calcOptions()" />
+            </div>
+            <div class="form-group">
+              <label>Risk-Free Rate (%) <span style="color:var(--text2);font-size:11px">default 5.25</span></label>
+              <input type="number" id="optR" step="0.01" value="5.25" oninput="calcOptions()" />
+            </div>
+            <div class="form-group">
+              <label>Contracts <span style="color:var(--text2);font-size:11px">for P&amp;L table (1 contract = 100 shares)</span></label>
+              <input type="number" id="optContracts" step="1" min="1" value="1" oninput="calcOptions()" />
+            </div>
+            <div class="form-group">
+              <label>Premium Paid per Share ($) <span style="color:var(--text2);font-size:11px">optional, for P&amp;L</span></label>
+              <input type="number" id="optPremium" step="0.01" placeholder="e.g. 3.50" oninput="calcOptions()" />
+            </div>
+          </div>
+
+          <!-- ── RESULTS ── -->
+          <div class="options-results-col">
+            <!-- Price -->
+            <div class="card opt-result-card">
+              <div class="opt-result-label">Theoretical Price</div>
+              <div class="opt-result-big" id="optPrice">—</div>
+              <div style="display:flex;gap:24px;margin-top:10px;flex-wrap:wrap">
+                <div><div class="opt-greek-label">Break-even</div><div class="opt-greek-val" id="optBreakeven">—</div></div>
+                <div><div class="opt-greek-label">Intrinsic Value</div><div class="opt-greek-val" id="optIntrinsic">—</div></div>
+                <div><div class="opt-greek-label">Time Value</div><div class="opt-greek-val" id="optTimeVal">—</div></div>
+              </div>
+            </div>
+
+            <!-- Greeks -->
+            <div class="card opt-result-card">
+              <div class="opt-result-label" style="margin-bottom:14px">Greeks</div>
+              <div class="greeks-grid">
+                <div class="greek-box">
+                  <div class="greek-name">Delta (Δ)</div>
+                  <div class="greek-val" id="optDelta">—</div>
+                  <div class="greek-desc">Price change per $1 move</div>
+                </div>
+                <div class="greek-box">
+                  <div class="greek-name">Gamma (Γ)</div>
+                  <div class="greek-val" id="optGamma">—</div>
+                  <div class="greek-desc">Delta change per $1 move</div>
+                </div>
+                <div class="greek-box">
+                  <div class="greek-name">Theta (Θ)</div>
+                  <div class="greek-val red" id="optTheta">—</div>
+                  <div class="greek-desc">Value lost per day</div>
+                </div>
+                <div class="greek-box">
+                  <div class="greek-name">Vega (V)</div>
+                  <div class="greek-val" id="optVega">—</div>
+                  <div class="greek-desc">Price change per 1% IV</div>
+                </div>
+                <div class="greek-box">
+                  <div class="greek-name">Rho (ρ)</div>
+                  <div class="greek-val" id="optRho">—</div>
+                  <div class="greek-desc">Change per 1% rate move</div>
+                </div>
+                <div class="greek-box">
+                  <div class="greek-name">IV Rank</div>
+                  <div class="greek-val" id="optMoneyness">—</div>
+                  <div class="greek-desc">Moneyness</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── P&L AT EXPIRATION ── -->
+        <div class="card" id="optPnlCard" style="margin-top:20px;display:none">
+          <h2 style="font-size:15px;color:var(--accent);margin-bottom:16px">P&amp;L at Expiration</h2>
+          <div style="overflow-x:auto">
+            <table id="optPnlTable" style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr>
+                  <th style="padding:8px 12px;text-align:left;color:var(--accent);white-space:nowrap">Stock Price</th>
+                  <th style="padding:8px 12px;text-align:left;color:var(--accent);white-space:nowrap">Option Value</th>
+                  <th style="padding:8px 12px;text-align:left;color:var(--accent);white-space:nowrap">P&amp;L / contract</th>
+                  <th style="padding:8px 12px;text-align:left;color:var(--accent);white-space:nowrap">Total P&amp;L</th>
+                </tr>
+              </thead>
+              <tbody id="optPnlBody"></tbody>
+            </table>
           </div>
         </div>
       </section>
