@@ -235,10 +235,6 @@ function showTab(tabName) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`tab-${tabName}`).classList.add('active');
   document.querySelector(`.nav-btn[data-tab="${tabName}"]`).classList.add('active');
-  // Sync mobile bottom nav
-  document.querySelectorAll('.mob-nav-btn[data-tab]').forEach(b => b.classList.remove('active'));
-  const bottomBtn = document.querySelector(`.mob-nav-btn[data-tab="${tabName}"]`);
-  if (bottomBtn) bottomBtn.classList.add('active');
 }
 
 // ── LOAD DATA ───────────────────────────────────────────────────────────────
@@ -898,14 +894,7 @@ function setupEventListeners() {
     document.getElementById('settingsModal')?.classList.remove('hidden');
   });
 
-  // Mobile bottom nav
-  document.querySelectorAll('.mob-nav-btn[data-tab]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      showTab(btn.dataset.tab);
-      if (btn.dataset.tab === 'trading') initTradingTab();
-      if (btn.dataset.tab === 'news') initNewsTab();
-    });
-  });
+
 
   // Trading subnav
   document.querySelectorAll('.t-nav-btn').forEach(btn => {
