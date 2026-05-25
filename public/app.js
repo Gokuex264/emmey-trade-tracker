@@ -906,7 +906,6 @@ function setupEventListeners() {
       if (btn.dataset.tab === 'news') initNewsTab();
     });
   });
-  document.getElementById('mobBottomMore')?.addEventListener('click', openMobSidebar);
 
   // Trading subnav
   document.querySelectorAll('.t-nav-btn').forEach(btn => {
