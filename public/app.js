@@ -64,6 +64,7 @@ async function showApp(user) {
   renderMyTradeSymbols();
   checkApiKey();
   setupEventListeners();
+  setupTickerPreviews();
 
   document.querySelector('#quickTradeForm [name="date"]').value = new Date().toISOString().split('T')[0];
   document.querySelector('#tradeForm [name="date"]').value = new Date().toISOString().split('T')[0];
@@ -1930,6 +1931,55 @@ function escHtml(str) {
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── LIVE TICKER LOGO PREVIEW ─────────────────────────────────────────────────
+
+function attachTickerPreview(inputEl, badgeEl) {
+  if (!inputEl || !badgeEl) return;
+  let debounce;
+  inputEl.addEventListener('input', () => {
+    clearTimeout(debounce);
+    const sym = inputEl.value.trim().toUpperCase().replace(/[^A-Z0-9.!]/g, '');
+    if (sym.length < 1) { badgeEl.classList.add('hidden'); return; }
+    debounce = setTimeout(() => showTickerBadge(sym, badgeEl), 300);
+  });
+  inputEl.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (!inputEl.value.trim()) badgeEl.classList.add('hidden');
+    }, 200);
+  });
+}
+
+function showTickerBadge(sym, badgeEl) {
+  badgeEl.innerHTML = tickerLogo(sym, 22) + `<span>${sym}</span>`;
+  badgeEl.classList.remove('hidden');
+  // swap in hidden avatar if img fails
+  const img = badgeEl.querySelector('img');
+  if (img) {
+    img.addEventListener('error', () => {}, { once: true });
+  }
+}
+
+function setupTickerPreviews() {
+  // Charts tab
+  attachTickerPreview(
+    document.getElementById('chartSymbolInput'),
+    document.getElementById('chartTickerBadge')
+  );
+  // News search
+  attachTickerPreview(
+    document.getElementById('newsTickerInput'),
+    document.getElementById('newsTickerBadge')
+  );
+  // Quick add trade (dashboard)
+  const quickSymbol = document.querySelector('#quickTradeForm [name="symbol"]');
+  attachTickerPreview(quickSymbol, document.getElementById('quickTradeTickerBadge'));
+  // Trade modal
+  attachTickerPreview(
+    document.getElementById('modalSymbolInput'),
+    document.getElementById('modalTickerBadge')
+  );
 }
 
 // ── MOBILE NAV ───────────────────────────────────────────────────────────────

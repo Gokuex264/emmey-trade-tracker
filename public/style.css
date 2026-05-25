@@ -1266,6 +1266,38 @@ label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: 
 .exp-tab-btn:hover { background: var(--bg3); color: var(--text); }
 .exp-tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 
+/* ── TICKER INPUT LIVE BADGE ── */
+.ticker-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+.ticker-input-wrap input {
+  padding-right: 10px;
+}
+.ticker-live-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px 4px 6px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-left: 8px;
+  animation: badgePop 0.18s ease;
+  flex-shrink: 0;
+}
+@keyframes badgePop {
+  from { transform: scale(0.8); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.ticker-live-badge.hidden { display: none; }
+
 /* ── TICKER LOGOS ── */
 .ticker-logo-wrap {
   display: inline-flex;
