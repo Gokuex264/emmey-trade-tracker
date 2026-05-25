@@ -1364,7 +1364,6 @@ label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: 
   .mob-sidebar.open {
     transform: translateX(0);
   }
-  .mob-sidebar.hidden { display: flex; } /* keep in DOM, just off-screen */
 
   .mob-sidebar-header {
     display: flex;

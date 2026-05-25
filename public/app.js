@@ -1935,14 +1935,18 @@ function formatDate(iso) {
 // ── MOBILE NAV ───────────────────────────────────────────────────────────────
 
 function openMobSidebar() {
-  document.getElementById('mobSidebar').classList.add('open');
-  document.getElementById('mobSidebarOverlay').classList.add('open');
+  const s = document.getElementById('mobSidebar');
+  const o = document.getElementById('mobSidebarOverlay');
+  if (s) s.classList.add('open');
+  if (o) o.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 
 function closeMobSidebar() {
-  document.getElementById('mobSidebar').classList.remove('open');
-  document.getElementById('mobSidebarOverlay').classList.remove('open');
+  const s = document.getElementById('mobSidebar');
+  const o = document.getElementById('mobSidebarOverlay');
+  if (s) s.classList.remove('open');
+  if (o) o.classList.remove('open');
   document.body.style.overflow = '';
 }
 
