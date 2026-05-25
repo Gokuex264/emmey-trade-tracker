@@ -50,6 +50,8 @@ async function showApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appWrapper').classList.remove('hidden');
   document.getElementById('sidebarUsername').textContent = user.username;
+  const mobUser = document.getElementById('mobDrawerUsername');
+  if (mobUser) mobUser.textContent = user.username;
   document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   await loadTrades();
@@ -823,6 +825,36 @@ function setupEventListeners() {
       if (btn.dataset.tab === 'trading') initTradingTab();
       if (btn.dataset.tab === 'news') initNewsTab();
     });
+  });
+
+  // Mobile bottom nav
+  document.querySelectorAll('.mob-nav-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showTab(btn.dataset.tab);
+      if (btn.dataset.tab === 'trading') initTradingTab();
+      if (btn.dataset.tab === 'news') initNewsTab();
+      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // More drawer
+  document.getElementById('moreNavBtn')?.addEventListener('click', openMobDrawer);
+  document.getElementById('mobDrawerClose')?.addEventListener('click', closeMobDrawer);
+  document.getElementById('mobDrawerOverlay')?.addEventListener('click', closeMobDrawer);
+  document.querySelectorAll('.mob-drawer-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showTab(btn.dataset.tab);
+      if (btn.dataset.tab === 'trading') initTradingTab();
+      if (btn.dataset.tab === 'news') initNewsTab();
+      closeMobDrawer();
+      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
+    });
+  });
+  document.getElementById('mobLogoutBtn')?.addEventListener('click', () => { closeMobDrawer(); logout(); });
+  document.getElementById('mobSettingsBtn')?.addEventListener('click', () => {
+    closeMobDrawer();
+    document.getElementById('settingsModal')?.classList.remove('hidden');
   });
 
   // Trading subnav
@@ -1862,6 +1894,18 @@ function escHtml(str) {
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── MOBILE NAV ───────────────────────────────────────────────────────────────
+
+function openMobDrawer() {
+  document.getElementById('mobDrawer').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobDrawer() {
+  document.getElementById('mobDrawer').classList.add('hidden');
+  document.body.style.overflow = '';
 }
 
 // ── OPTIONS CALCULATOR ───────────────────────────────────────────────────────

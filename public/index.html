@@ -148,6 +148,49 @@
       </div>
     </aside>
 
+    <!-- MOBILE BOTTOM NAV -->
+    <nav class="mobile-nav">
+      <button class="mob-nav-btn active" data-tab="dashboard">
+        <span class="mob-nav-icon">📊</span>
+        <span class="mob-nav-label">Dashboard</span>
+      </button>
+      <button class="mob-nav-btn" data-tab="trades">
+        <span class="mob-nav-icon">💼</span>
+        <span class="mob-nav-label">Trades</span>
+      </button>
+      <button class="mob-nav-btn" data-tab="news">
+        <span class="mob-nav-icon">📰</span>
+        <span class="mob-nav-label">News</span>
+      </button>
+      <button class="mob-nav-btn" data-tab="chat">
+        <span class="mob-nav-icon">🤖</span>
+        <span class="mob-nav-label">AI</span>
+      </button>
+      <button class="mob-nav-btn" id="moreNavBtn">
+        <span class="mob-nav-icon">☰</span>
+        <span class="mob-nav-label">More</span>
+      </button>
+    </nav>
+
+    <!-- MOBILE MORE DRAWER -->
+    <div class="mob-drawer hidden" id="mobDrawer">
+      <div class="mob-drawer-overlay" id="mobDrawerOverlay"></div>
+      <div class="mob-drawer-panel">
+        <div class="mob-drawer-header">
+          <span id="mobDrawerUsername" style="font-weight:600;color:var(--text)"></span>
+          <button class="mob-drawer-close" id="mobDrawerClose">✕</button>
+        </div>
+        <button class="mob-drawer-btn" data-tab="notebook"><span>📓</span> Notebook</button>
+        <button class="mob-drawer-btn" data-tab="charts"><span>📉</span> Charts</button>
+        <button class="mob-drawer-btn" data-tab="options"><span>🧮</span> Options Calc</button>
+        <button class="mob-drawer-btn" data-tab="brokers"><span>🔗</span> Brokers</button>
+        <button class="mob-drawer-btn" data-tab="trading"><span>⚡</span> Trading</button>
+        <div class="mob-drawer-divider"></div>
+        <button class="mob-drawer-btn" id="mobSettingsBtn"><span>⚙️</span> Settings</button>
+        <button class="mob-drawer-btn mob-logout" id="mobLogoutBtn"><span>🚪</span> Log Out</button>
+      </div>
+    </div>
+
     <!-- MAIN CONTENT -->
     <main class="main">
 
