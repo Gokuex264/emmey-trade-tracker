@@ -1027,7 +1027,7 @@ function renderMyTradeSymbols() {
   if (!uniqueSymbols.length) { wrapper.style.display = 'none'; return; }
   wrapper.style.display = 'flex';
   chipsEl.innerHTML = uniqueSymbols.map(sym =>
-    `<button class="sym-chip" data-sym="${sym}" onclick="document.getElementById('chartSymbolInput').value='${sym}';loadChart('${sym}')">${sym}</button>`
+    `<button class="sym-chip" data-sym="${sym}" onclick="document.getElementById('chartSymbolInput').value='${sym}';loadChart('${sym}')">${tickerLogo(sym, 20)}<span>${sym}</span></button>`
   ).join('');
 }
 
@@ -1980,6 +1980,18 @@ function setupTickerPreviews() {
     document.getElementById('modalSymbolInput'),
     document.getElementById('modalTickerBadge')
   );
+
+  // Stamp logos onto all quick-symbol chips that have data-sym
+  stampChipLogos();
+}
+
+function stampChipLogos() {
+  document.querySelectorAll('.sym-chip[data-sym]').forEach(chip => {
+    const sym = chip.dataset.sym.replace(/[^A-Z0-9.!]/gi, '').toUpperCase();
+    // extract just the display label (before any parenthetical)
+    const label = chip.textContent.trim();
+    chip.innerHTML = tickerLogo(sym, 20) + `<span>${label}</span>`;
+  });
 }
 
 // ── MOBILE NAV ───────────────────────────────────────────────────────────────

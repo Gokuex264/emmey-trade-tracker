@@ -624,9 +624,10 @@ tbody tr:hover { background: var(--bg3); }
   align-items: center;
   flex-wrap: wrap;
 }
+.chart-search-row .ticker-input-wrap { flex: 1; min-width: 200px; }
 .chart-search-row input {
   flex: 1;
-  min-width: 200px;
+  min-width: 0;
   background: var(--bg3);
   border: 1px solid var(--border);
   color: var(--text);
@@ -661,11 +662,15 @@ tbody tr:hover { background: var(--bg3); }
   background: var(--bg3);
   border: 1px solid var(--border);
   color: var(--text2);
-  padding: 4px 12px;
-  border-radius: 14px;
+  padding: 5px 11px 5px 6px;
+  border-radius: 20px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 600;
   transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .sym-chip:hover { border-color: var(--blue); color: var(--blue); background: rgba(31,111,235,0.08); }
 .sym-chip.active { border-color: var(--blue); color: var(--blue); background: rgba(31,111,235,0.15); }
@@ -1083,8 +1088,9 @@ label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: 
 .news-search-row {
   display: flex; gap: 8px; align-items: center;
 }
+.news-search-row .ticker-input-wrap { width: 280px; }
 .news-search-row input {
-  width: 280px;
+  width: 100%;
   padding: 8px 12px;
   background: var(--bg2);
   border: 1px solid var(--border);
