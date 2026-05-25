@@ -267,6 +267,42 @@ function getPnL(trade) {
   return trade.pnl.toString().trim();
 }
 
+// ── TICKER LOGO HELPER ───────────────────────────────────────────────────────
+const LOGO_COLORS = ['#1f6feb','#238636','#da3633','#d29922','#8b5cf6','#0ea5e9','#f97316','#10b981','#ec4899','#14b8a6'];
+
+function avatarColor(symbol) {
+  let hash = 0;
+  for (let i = 0; i < symbol.length; i++) hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+  return LOGO_COLORS[Math.abs(hash) % LOGO_COLORS.length];
+}
+
+// Returns HTML string with logo img + letter-avatar fallback
+function tickerLogo(symbol, size = 26) {
+  const sym    = (symbol || '?').toUpperCase();
+  const letter = sym[0];
+  const color  = avatarColor(sym);
+  const fs     = Math.max(9, Math.floor(size * 0.38));
+  const src    = logoSrc(sym);
+  return `<span class="ticker-logo-wrap">` +
+    `<img class="ticker-logo" width="${size}" height="${size}" src="${src}" ` +
+    `onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'" alt="${sym}" />` +
+    `<span class="ticker-avatar" style="width:${size}px;height:${size}px;background:${color};font-size:${fs}px;display:none">${letter}</span>` +
+    `</span>`;
+}
+
+function logoSrc(sym) {
+  // Crypto tickers - use CoinGecko icon mapping
+  const cryptoMap = { BTC:'bitcoin',ETH:'ethereum',SOL:'solana',DOGE:'dogecoin',ADA:'cardano',XRP:'ripple',BNB:'binancecoin',AVAX:'avalanche-2',MATIC:'matic-network',DOT:'polkadot',LINK:'chainlink',LTC:'litecoin',SHIB:'shiba-inu',UNI:'uniswap',ATOM:'cosmos' };
+  if (cryptoMap[sym]) return `https://assets.coingecko.com/coins/images/${coinGeckoId(cryptoMap[sym])}/small/${cryptoMap[sym]}.png`;
+  // US stocks / ETFs via parqet
+  return `https://assets.parqet.com/logos/symbol/${sym}?format=png`;
+}
+
+function coinGeckoId(name) {
+  const ids = { bitcoin:'1',ethereum:'279',solana:'4128',dogecoin:'5',cardano:'975',ripple:'44',binancecoin:'825','avalanche-2':'12559','matic-network':'8713',polkadot:'12171',chainlink:'877',litecoin:'2','shiba-inu':'11939',uniswap:'12504',cosmos:'3861' };
+  return ids[name] || '1';
+}
+
 function formatPnL(raw) {
   if (!raw) return '<span class="pnl-open">—</span>';
   const num = parseFloat(raw.replace(/[^0-9.\-+]/g, ''));
@@ -306,10 +342,13 @@ function updateDashboard() {
   }
   el.innerHTML = recent.map(t => `
     <div class="recent-item">
-      <div>
-        <span class="recent-symbol">${t.symbol.toUpperCase()}</span>
-        <span class="badge badge-${t.assetType || 'stock'}" style="margin-left:8px">${(t.assetType || 'stock').toUpperCase()}</span>
-        <span class="badge badge-${t.direction || 'long'}" style="margin-left:4px">${(t.direction || 'long').toUpperCase()}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${tickerLogo(t.symbol, 30)}
+        <div>
+          <span class="recent-symbol">${t.symbol.toUpperCase()}</span>
+          <span class="badge badge-${t.assetType || 'stock'}" style="margin-left:6px">${(t.assetType || 'stock').toUpperCase()}</span>
+          <span class="badge badge-${t.direction || 'long'}" style="margin-left:4px">${(t.direction || 'long').toUpperCase()}</span>
+        </div>
       </div>
       <div>${formatPnL(t.pnl)}</div>
     </div>`
@@ -339,7 +378,7 @@ function renderTradesTable() {
     const date = t.date || t.createdAt?.split('T')[0] || '';
     const reason = t.reason ? escHtml(t.reason.slice(0, 60)) + (t.reason.length > 60 ? '…' : '') : '—';
     return `<tr>
-      <td><strong>${t.symbol.toUpperCase()}</strong></td>
+      <td><span class="ticker-logo-wrap">${tickerLogo(t.symbol, 24)}<strong class="ticker-name">${t.symbol.toUpperCase()}</strong></span></td>
       <td><span class="badge badge-${t.assetType || 'stock'}">${(t.assetType || 'stock').toUpperCase()}</span></td>
       <td><span class="badge badge-${t.direction || 'long'}">${(t.direction || 'long').toUpperCase()}</span></td>
       <td>${t.entryPrice || '—'}</td>
@@ -1086,7 +1125,7 @@ async function loadMyTickersNews() {
   emptyEl.classList.add('hidden');
 
   chipsEl.innerHTML = symbols.map(s =>
-    `<button class="sym-chip" onclick="filterMyTickerNews('${s}')">${escHtml(s)}</button>`
+    `<button class="sym-chip" onclick="filterMyTickerNews('${s}')" style="display:inline-flex;align-items:center;gap:6px">${tickerLogo(s, 18)}${escHtml(s)}</button>`
   ).join('');
 
   feedEl.innerHTML = '<div class="news-loading"><div class="loading-spinner"></div> Loading news for your tickers…</div>';
@@ -1824,7 +1863,7 @@ function showImportPreview(parsedTrades, summaryText) {
     return `
     <tr class="${dup ? 'import-row-dup' : ''}">
       <td><input type="checkbox" class="import-chk" data-idx="${i}" ${dup ? '' : 'checked'} onchange="updateImportCount()" /></td>
-      <td><strong>${escHtml(t.symbol)}</strong></td>
+      <td><span class="ticker-logo-wrap">${tickerLogo(t.symbol, 22)}<strong class="ticker-name">${escHtml(t.symbol)}</strong></span></td>
       <td><span class="badge badge-${t.direction || 'long'}">${(t.direction || 'long').toUpperCase()}</span></td>
       <td>${t.entryPrice || '—'}</td>
       <td>${t.exitPrice || '—'}</td>
@@ -1941,7 +1980,7 @@ async function loadChain(dateTs) {
     chainExpiries  = data.expirationDates || [];
 
     setChainStatus(
-      `${data.symbol} — Current price: <strong>$${chainPrice?.toFixed(2) ?? '—'}</strong>`,
+      `<span class="chain-ticker-header">${tickerLogo(data.symbol, 36)}<span class="ticker-name">${data.symbol}</span><span class="chain-price">$${chainPrice?.toFixed(2) ?? '—'}</span></span>`,
       'ok'
     );
 

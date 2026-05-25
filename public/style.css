@@ -1266,6 +1266,39 @@ label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: 
 .exp-tab-btn:hover { background: var(--bg3); color: var(--text); }
 .exp-tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 
+/* ── TICKER LOGOS ── */
+.ticker-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ticker-logo {
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--bg3);
+  flex-shrink: 0;
+  display: block;
+}
+.ticker-avatar {
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: -0.5px;
+}
+.ticker-name { font-weight: 700; }
+
+/* Chain header logo */
+.chain-ticker-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 6px;
+}
+.chain-ticker-header .ticker-name { font-size: 18px; }
+.chain-ticker-header .chain-price  { font-size: 13px; color: var(--text2); }
+
 /* ── MOBILE SLIDE-IN SIDEBAR ── */
 
 /* Hidden on desktop */
