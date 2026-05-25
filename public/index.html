@@ -148,46 +148,39 @@
       </div>
     </aside>
 
-    <!-- MOBILE BOTTOM NAV -->
-    <nav class="mobile-nav">
-      <button class="mob-nav-btn active" data-tab="dashboard">
-        <span class="mob-nav-icon">📊</span>
-        <span class="mob-nav-label">Dashboard</span>
-      </button>
-      <button class="mob-nav-btn" data-tab="trades">
-        <span class="mob-nav-icon">💼</span>
-        <span class="mob-nav-label">Trades</span>
-      </button>
-      <button class="mob-nav-btn" data-tab="news">
-        <span class="mob-nav-icon">📰</span>
-        <span class="mob-nav-label">News</span>
-      </button>
-      <button class="mob-nav-btn" data-tab="chat">
-        <span class="mob-nav-icon">🤖</span>
-        <span class="mob-nav-label">AI</span>
-      </button>
-      <button class="mob-nav-btn" id="moreNavBtn">
-        <span class="mob-nav-icon">☰</span>
-        <span class="mob-nav-label">More</span>
-      </button>
-    </nav>
+    <!-- MOBILE TOP BAR -->
+    <header class="mobile-topbar">
+      <button class="mob-hamburger" id="mobHamburger">&#9776;</button>
+      <span class="mob-topbar-title">📈 TradeTracker</span>
+      <span id="mobTopbarTab" class="mob-topbar-tab"></span>
+    </header>
 
-    <!-- MOBILE MORE DRAWER -->
-    <div class="mob-drawer hidden" id="mobDrawer">
-      <div class="mob-drawer-overlay" id="mobDrawerOverlay"></div>
-      <div class="mob-drawer-panel">
-        <div class="mob-drawer-header">
-          <span id="mobDrawerUsername" style="font-weight:600;color:var(--text)"></span>
-          <button class="mob-drawer-close" id="mobDrawerClose">✕</button>
+    <!-- MOBILE SLIDE-IN SIDEBAR -->
+    <div class="mob-sidebar-overlay hidden" id="mobSidebarOverlay"></div>
+    <div class="mob-sidebar hidden" id="mobSidebar">
+      <div class="mob-sidebar-header">
+        <div class="mob-sidebar-user">
+          <span style="font-size:20px">👤</span>
+          <span id="mobSidebarUsername" style="font-weight:600;font-size:15px"></span>
         </div>
-        <button class="mob-drawer-btn" data-tab="notebook"><span>📓</span> Notebook</button>
-        <button class="mob-drawer-btn" data-tab="charts"><span>📉</span> Charts</button>
-        <button class="mob-drawer-btn" data-tab="options"><span>🧮</span> Options Calc</button>
-        <button class="mob-drawer-btn" data-tab="brokers"><span>🔗</span> Brokers</button>
-        <button class="mob-drawer-btn" data-tab="trading"><span>⚡</span> Trading</button>
-        <div class="mob-drawer-divider"></div>
-        <button class="mob-drawer-btn" id="mobSettingsBtn"><span>⚙️</span> Settings</button>
-        <button class="mob-drawer-btn mob-logout" id="mobLogoutBtn"><span>🚪</span> Log Out</button>
+        <button class="mob-sidebar-close" id="mobSidebarClose">✕</button>
+      </div>
+
+      <nav class="mob-sidebar-nav">
+        <button class="mob-sidebar-btn active" data-tab="dashboard"><span>📊</span> Dashboard</button>
+        <button class="mob-sidebar-btn" data-tab="trades"><span>💼</span> Trades</button>
+        <button class="mob-sidebar-btn" data-tab="notebook"><span>📓</span> Notebook</button>
+        <button class="mob-sidebar-btn" data-tab="charts"><span>📉</span> Charts</button>
+        <button class="mob-sidebar-btn" data-tab="news"><span>📰</span> News</button>
+        <button class="mob-sidebar-btn" data-tab="chat"><span>🤖</span> AI Analyst</button>
+        <button class="mob-sidebar-btn" data-tab="options"><span>🧮</span> Options Calc</button>
+        <button class="mob-sidebar-btn" data-tab="brokers"><span>🔗</span> Brokers</button>
+        <button class="mob-sidebar-btn" data-tab="trading"><span>⚡</span> Trading</button>
+      </nav>
+
+      <div class="mob-sidebar-footer">
+        <button class="mob-sidebar-btn" id="mobSettingsBtn"><span>⚙️</span> Settings</button>
+        <button class="mob-sidebar-btn mob-sidebar-logout" id="mobLogoutBtn"><span>🚪</span> Log Out</button>
       </div>
     </div>
 

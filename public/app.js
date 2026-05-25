@@ -50,7 +50,7 @@ async function showApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appWrapper').classList.remove('hidden');
   document.getElementById('sidebarUsername').textContent = user.username;
-  const mobUser = document.getElementById('mobDrawerUsername');
+  const mobUser = document.getElementById('mobSidebarUsername');
   if (mobUser) mobUser.textContent = user.username;
   document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -827,33 +827,30 @@ function setupEventListeners() {
     });
   });
 
-  // Mobile bottom nav
-  document.querySelectorAll('.mob-nav-btn[data-tab]').forEach(btn => {
+  // Mobile slide-in sidebar
+  document.getElementById('mobHamburger')?.addEventListener('click', openMobSidebar);
+  document.getElementById('mobSidebarClose')?.addEventListener('click', closeMobSidebar);
+  document.getElementById('mobSidebarOverlay')?.addEventListener('click', closeMobSidebar);
+
+  document.querySelectorAll('.mob-sidebar-btn[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       showTab(btn.dataset.tab);
       if (btn.dataset.tab === 'trading') initTradingTab();
       if (btn.dataset.tab === 'news') initNewsTab();
-      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
+      // update active state in sidebar
+      document.querySelectorAll('.mob-sidebar-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      // update topbar tab label
+      const label = btn.textContent.trim();
+      const topTab = document.getElementById('mobTopbarTab');
+      if (topTab) topTab.textContent = label;
+      closeMobSidebar();
     });
   });
 
-  // More drawer
-  document.getElementById('moreNavBtn')?.addEventListener('click', openMobDrawer);
-  document.getElementById('mobDrawerClose')?.addEventListener('click', closeMobDrawer);
-  document.getElementById('mobDrawerOverlay')?.addEventListener('click', closeMobDrawer);
-  document.querySelectorAll('.mob-drawer-btn[data-tab]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      showTab(btn.dataset.tab);
-      if (btn.dataset.tab === 'trading') initTradingTab();
-      if (btn.dataset.tab === 'news') initNewsTab();
-      closeMobDrawer();
-      document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
-    });
-  });
-  document.getElementById('mobLogoutBtn')?.addEventListener('click', () => { closeMobDrawer(); logout(); });
+  document.getElementById('mobLogoutBtn')?.addEventListener('click', () => { closeMobSidebar(); logout(); });
   document.getElementById('mobSettingsBtn')?.addEventListener('click', () => {
-    closeMobDrawer();
+    closeMobSidebar();
     document.getElementById('settingsModal')?.classList.remove('hidden');
   });
 
@@ -1898,13 +1895,15 @@ function formatDate(iso) {
 
 // ── MOBILE NAV ───────────────────────────────────────────────────────────────
 
-function openMobDrawer() {
-  document.getElementById('mobDrawer').classList.remove('hidden');
+function openMobSidebar() {
+  document.getElementById('mobSidebar').classList.add('open');
+  document.getElementById('mobSidebarOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 
-function closeMobDrawer() {
-  document.getElementById('mobDrawer').classList.add('hidden');
+function closeMobSidebar() {
+  document.getElementById('mobSidebar').classList.remove('open');
+  document.getElementById('mobSidebarOverlay').classList.remove('open');
   document.body.style.overflow = '';
 }
 
