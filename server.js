@@ -804,8 +804,9 @@ app.post('/api/trading/asset', requireAuth, async (req, res) => {
 // ─── AI CHAT API ──────────────────────────────────────────────────────────────
 
 app.post('/api/chat', requireAuth, async (req, res) => {
-  const { message, apiKey } = req.body;
-  if (!apiKey) return res.status(400).json({ error: 'API key is required' });
+  const { message } = req.body;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'AI chat is not configured on this server.' });
 
   const data = readData();
   const trades = data.trades.filter(t => t.userId === req.session.userId);

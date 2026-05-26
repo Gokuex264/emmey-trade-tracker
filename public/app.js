@@ -759,9 +759,8 @@ function fmt(cmd) {
 
 // ── AI CHAT ──────────────────────────────────────────────────────────────────
 function checkApiKey() {
-  const notice = document.getElementById('apiKeyNotice');
-  if (getApiKey()) notice.classList.add('hidden');
-  else notice.classList.remove('hidden');
+  // API key is now server-side; hide the notice for all users
+  document.getElementById('apiKeyNotice')?.classList.add('hidden');
 }
 
 function showSettings() {
@@ -778,9 +777,6 @@ async function sendMessage() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
   if (!msg) return;
-
-  const apiKey = getApiKey();
-  if (!apiKey) { showSettings(); return; }
 
   input.value = '';
   input.style.height = 'auto';
@@ -812,7 +808,7 @@ async function sendMessage() {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, apiKey })
+      body: JSON.stringify({ message: msg })
     });
 
     const reader = res.body.getReader();
