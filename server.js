@@ -6,6 +6,36 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const multer = require('multer');
+const mongoose = require('mongoose');
+
+// ── MONGODB SETUP ─────────────────────────────────────────────────────────────
+const AppDataSchema = new mongoose.Schema({ data: mongoose.Schema.Types.Mixed }, { collection: 'appdata' });
+const AppDataModel = mongoose.model('AppData', AppDataSchema);
+
+let appDataCache = null;
+let usingMongo = false;
+
+async function connectDb() {
+  if (!process.env.MONGODB_URI) return false;
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ MongoDB connected');
+    const doc = await AppDataModel.findOne({});
+    if (doc) {
+      appDataCache = doc.data;
+      ['users','trades','notebooks','notes','brokers','savedArticles'].forEach(k => {
+        if (!appDataCache[k]) appDataCache[k] = [];
+      });
+    } else {
+      appDataCache = { users: [], trades: [], notebooks: [], notes: [], brokers: [], savedArticles: [] };
+      await AppDataModel.create({ data: appDataCache });
+    }
+    return true;
+  } catch (err) {
+    console.error('❌ MongoDB error:', err.message);
+    return false;
+  }
+}
 
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -293,11 +323,18 @@ function normalizeAlpacaPositions(positions) {
 }
 
 function readData() {
+  if (usingMongo) return JSON.parse(JSON.stringify(appDataCache));
   initData();
   return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
 }
 
 function writeData(data) {
+  if (usingMongo) {
+    appDataCache = data;
+    AppDataModel.findOneAndUpdate({}, { data }, { upsert: true, new: true })
+      .catch(err => console.error('DB write error:', err));
+    return;
+  }
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
@@ -861,6 +898,10 @@ Guidelines:
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n✅ Trade Tracker running at http://localhost:${PORT}\n`);
+connectDb().then(ok => {
+  usingMongo = ok;
+  if (!ok) console.log('⚠️  No MONGODB_URI set — using local data.json');
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n✅ Trade Tracker running at http://localhost:${PORT}\n`);
+  });
 });
