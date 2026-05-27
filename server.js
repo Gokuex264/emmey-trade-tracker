@@ -838,7 +838,7 @@ Guidelines:
   try {
     const client = new Anthropic({ apiKey });
     const stream = await client.messages.stream({
-      model: 'claude-opus-4-6',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: systemPrompt,
       messages: [{ role: 'user', content: message }]

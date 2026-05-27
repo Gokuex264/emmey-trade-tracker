@@ -811,6 +811,14 @@ async function sendMessage() {
       body: JSON.stringify({ message: msg })
     });
 
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({ error: `Server error ${res.status}` }));
+      const bubbleEl = document.getElementById(`${aiId}-bubble`);
+      if (bubbleEl) { bubbleEl.classList.remove('msg-streaming'); bubbleEl.textContent = '❌ ' + (errData.error || 'Server error'); }
+      document.getElementById('sendBtn').disabled = false;
+      return;
+    }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     const bubbleEl = document.getElementById(`${aiId}-bubble`);
