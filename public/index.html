@@ -137,6 +137,9 @@
         <button class="nav-btn" data-tab="options">
           <span>🧮</span> Options Calc
         </button>
+        <button class="nav-btn" data-tab="portfolios">
+          <span>📁</span> Portfolios
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div class="user-info">
@@ -176,6 +179,7 @@
         <button class="mob-sidebar-btn" data-tab="options"><span>🧮</span> Options Calc</button>
         <button class="mob-sidebar-btn" data-tab="brokers"><span>🔗</span> Brokers</button>
         <button class="mob-sidebar-btn" data-tab="trading"><span>⚡</span> Trading</button>
+        <button class="mob-sidebar-btn" data-tab="portfolios"><span>📁</span> Portfolios</button>
       </nav>
 
       <div class="mob-sidebar-footer">
@@ -937,7 +941,137 @@
         </div>
       </section>
 
+      <!-- ── PORTFOLIOS ── -->
+      <section id="tab-portfolios" class="tab">
+
+        <!-- Overview screen -->
+        <div id="portfolioOverview">
+          <div class="page-header">
+            <div>
+              <h1>Portfolios</h1>
+              <p style="color:var(--text2);font-size:13px;margin-top:2px">Organize and track multiple investment strategies</p>
+            </div>
+            <button class="btn-primary" onclick="showCreatePortfolioModal()">+ New Portfolio</button>
+          </div>
+          <div id="portfolioGrid" class="portfolio-grid"></div>
+        </div>
+
+        <!-- Detail screen -->
+        <div id="portfolioDetail" class="hidden">
+          <div class="port-detail-topbar">
+            <button class="btn-back" onclick="closePortfolioDetail()">← Back</button>
+            <div style="display:flex;align-items:center;gap:10px;flex:1">
+              <div id="portDetailDot" class="port-color-dot"></div>
+              <h1 id="portDetailName" style="font-size:22px;font-weight:800;letter-spacing:-0.5px"></h1>
+            </div>
+            <button class="btn-primary" onclick="openAddTradeToPortfolio()">+ Add Trade</button>
+          </div>
+
+          <div class="port-stats-bar card">
+            <div class="port-stat">
+              <div class="port-stat-label">Realized P&amp;L</div>
+              <div class="port-stat-value" id="portStatPnl">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Win Rate</div>
+              <div class="port-stat-value" id="portStatWin">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Total Trades</div>
+              <div class="port-stat-value" id="portStatTotal">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Open Positions</div>
+              <div class="port-stat-value" id="portStatOpen">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Closed Trades</div>
+              <div class="port-stat-value" id="portStatClosed">—</div>
+            </div>
+          </div>
+
+          <div class="card port-chart-card">
+            <div class="card-header">
+              <h2>Cumulative P&amp;L</h2>
+              <div class="port-tf-row">
+                <button class="port-tf-btn active" data-tf="all">All</button>
+                <button class="port-tf-btn" data-tf="3m">3M</button>
+                <button class="port-tf-btn" data-tf="1m">1M</button>
+                <button class="port-tf-btn" data-tf="ytd">YTD</button>
+              </div>
+            </div>
+            <div id="portChartWrap" class="port-chart-wrap"></div>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <div class="card-header">
+              <h2>Positions</h2>
+              <span id="portTradeCount" style="font-size:12px;color:var(--text2)"></span>
+            </div>
+            <div class="table-wrapper" style="overflow-x:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Direction</th>
+                    <th>Entry</th>
+                    <th>Exit</th>
+                    <th>P&amp;L</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="portTradesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
+
+  <!-- ── CREATE PORTFOLIO MODAL ── -->
+  <div id="createPortfolioModal" class="modal hidden">
+    <div class="modal-box small">
+      <div class="modal-header">
+        <h2 id="portModalTitle">New Portfolio</h2>
+        <button class="close-modal" onclick="closeCreatePortfolioModal()">✕</button>
+      </div>
+      <div class="modal-form">
+        <input type="hidden" id="editPortfolioId" />
+        <div class="form-group">
+          <label>Portfolio Name</label>
+          <input type="text" id="portNameInput" placeholder="e.g. Growth Strategy, Crypto, Options Plays" />
+        </div>
+        <div class="form-group">
+          <label>Description (optional)</label>
+          <input type="text" id="portDescInput" placeholder="Brief description of this portfolio" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <div class="port-color-picker" id="portColorPicker">
+            <div class="port-color-swatch active" data-color="#1a56db" style="background:#1a56db"></div>
+            <div class="port-color-swatch" data-color="#3fb950" style="background:#3fb950"></div>
+            <div class="port-color-swatch" data-color="#da3633" style="background:#da3633"></div>
+            <div class="port-color-swatch" data-color="#d29922" style="background:#d29922"></div>
+            <div class="port-color-swatch" data-color="#8b5cf6" style="background:#8b5cf6"></div>
+            <div class="port-color-swatch" data-color="#0ea5e9" style="background:#0ea5e9"></div>
+            <div class="port-color-swatch" data-color="#f97316" style="background:#f97316"></div>
+            <div class="port-color-swatch" data-color="#ec4899" style="background:#ec4899"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="closeCreatePortfolioModal()">Cancel</button>
+          <button class="btn-primary" onclick="savePortfolio()">Create Portfolio</button>
+        </div>
+      </div>
+    </div>
+  </div>
   </div>
 
   <!-- TRADE MODAL -->
@@ -949,6 +1083,7 @@
       </div>
       <form id="tradeForm" class="modal-form">
         <input type="hidden" name="id" />
+        <input type="hidden" id="editPortfolioTarget" />
         <div class="form-grid">
           <div class="form-group">
             <label>Symbol *</label>

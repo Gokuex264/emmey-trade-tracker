@@ -4,6 +4,9 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── STATE ──────────────────────────────────────────────────────────────────
+let portfolios = [];
+let activePortfolioId = null;
+let portfolioChartTimeframe = 'all';
 let trades = [];
 let notebooks = [];
 let notes = [];          // pages inside the active notebook
@@ -57,10 +60,12 @@ async function showApp(user) {
   await loadTrades();
   await loadNotebooks();
   await loadBrokers();
+  await loadPortfolios();
   updateDashboard();
   renderTradesTable();
   renderNotebooksGrid();
   renderBrokersPage();
+  renderPortfoliosGrid();
   renderMyTradeSymbols();
   checkApiKey();
   setupEventListeners();
@@ -431,6 +436,9 @@ async function saveTrade(e) {
   if (!data.reason) delete data.reason;
   if (!data.notes) delete data.notes;
 
+  const portTarget = document.getElementById('editPortfolioTarget')?.value;
+  if (portTarget) data.portfolioId = portTarget;
+
   try {
     if (editingTradeId) {
       const res = await fetch(`/api/trades/${editingTradeId}`, {
@@ -449,9 +457,12 @@ async function saveTrade(e) {
       trades.push(newTrade);
     }
     document.getElementById('tradeModal').classList.add('hidden');
+    document.getElementById('editPortfolioTarget').value = '';
     updateDashboard();
     renderTradesTable();
     renderMyTradeSymbols();
+    renderPortfoliosGrid();
+    if (activePortfolioId) renderPortfolioDetail(activePortfolioId);
   } catch (err) { alert('Error saving trade: ' + err.message); }
 }
 
@@ -953,6 +964,14 @@ function setupEventListeners() {
   document.getElementById('chatInput').addEventListener('input', function() {
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  // Portfolio color picker
+  document.querySelectorAll('.port-color-swatch').forEach(swatch => {
+    swatch.addEventListener('click', () => {
+      document.querySelectorAll('.port-color-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+    });
   });
 
   document.getElementById('settingsBtn').addEventListener('click', showSettings);
@@ -2016,6 +2035,251 @@ function closeMobSidebar() {
   if (s) s.classList.remove('open');
   if (o) o.classList.remove('open');
   document.body.style.overflow = '';
+}
+
+// ── PORTFOLIOS ───────────────────────────────────────────────────────────────
+
+async function loadPortfolios() {
+  try {
+    const res = await fetch('/api/portfolios');
+    if (res.status === 401) { showAuthScreen(); return; }
+    portfolios = await res.json();
+  } catch { portfolios = []; }
+}
+
+function renderPortfoliosGrid() {
+  const grid = document.getElementById('portfolioGrid');
+  if (!grid) return;
+
+  if (!portfolios.length) {
+    grid.innerHTML = `
+      <div class="port-empty-state">
+        <div style="font-size:52px;margin-bottom:16px">📁</div>
+        <h3>No portfolios yet</h3>
+        <p>Create your first portfolio to start organizing and tracking your trades separately</p>
+        <button class="btn-primary" style="margin-top:18px" onclick="showCreatePortfolioModal()">+ Create First Portfolio</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = portfolios.map(p => {
+    const portTrades = trades.filter(t => t.portfolioId === p.id);
+    const closed = portTrades.filter(t => t.status === 'closed');
+    const totalPnl = closed.reduce((s, t) => s + (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0), 0);
+    const winners = closed.filter(t => (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0) > 0);
+    const winRate = closed.length ? Math.round(winners.length / closed.length * 100) : 0;
+    const isPos = totalPnl >= 0;
+    return `
+      <div class="portfolio-card" onclick="openPortfolioDetail('${p.id}')">
+        <div class="port-card-bar" style="background:${p.color}"></div>
+        <div class="port-card-top">
+          <div class="port-card-icon" style="background:${p.color}22;color:${p.color}">📁</div>
+          <button class="port-card-del" onclick="event.stopPropagation();deletePortfolio('${p.id}')">✕</button>
+        </div>
+        <div class="port-card-name">${escHtml(p.name)}</div>
+        ${p.description ? `<div class="port-card-desc">${escHtml(p.description)}</div>` : ''}
+        <div class="port-card-footer">
+          <span class="port-card-pnl ${isPos ? 'pnl-pos' : 'pnl-neg'}">${isPos ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}</span>
+          <span class="port-card-meta">${portTrades.length} trade${portTrades.length !== 1 ? 's' : ''} · ${winRate}% win</span>
+        </div>
+      </div>`;
+  }).join('') + `
+    <div class="portfolio-card portfolio-card-add" onclick="showCreatePortfolioModal()">
+      <div class="port-add-icon">+</div>
+      <div class="port-add-label">New Portfolio</div>
+    </div>`;
+}
+
+function openPortfolioDetail(portfolioId) {
+  activePortfolioId = portfolioId;
+  portfolioChartTimeframe = 'all';
+  const p = portfolios.find(x => x.id === portfolioId);
+  if (!p) return;
+
+  document.getElementById('portfolioOverview').classList.add('hidden');
+  document.getElementById('portfolioDetail').classList.remove('hidden');
+
+  document.getElementById('portDetailName').textContent = p.name;
+  const dot = document.getElementById('portDetailDot');
+  dot.style.background = p.color;
+
+  renderPortfolioDetail(portfolioId);
+
+  document.querySelectorAll('.port-tf-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tf === 'all');
+    btn.onclick = () => {
+      portfolioChartTimeframe = btn.dataset.tf;
+      document.querySelectorAll('.port-tf-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      drawPortfolioChart(trades.filter(t => t.portfolioId === portfolioId), 'portChartWrap', portfolioChartTimeframe);
+    };
+  });
+}
+
+function renderPortfolioDetail(portfolioId) {
+  const portTrades = trades.filter(t => t.portfolioId === portfolioId);
+  const closed = portTrades.filter(t => t.status === 'closed');
+  const open = portTrades.filter(t => t.status === 'open');
+  const totalPnl = closed.reduce((s, t) => s + (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0), 0);
+  const winners = closed.filter(t => (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0) > 0);
+  const winRate = closed.length ? Math.round(winners.length / closed.length * 100) : 0;
+  const isPos = totalPnl >= 0;
+
+  document.getElementById('portStatPnl').innerHTML = `<span class="${isPos ? 'pnl-pos' : 'pnl-neg'}">${isPos ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}</span>`;
+  document.getElementById('portStatWin').textContent = closed.length ? `${winRate}%` : '—';
+  document.getElementById('portStatTotal').textContent = portTrades.length;
+  document.getElementById('portStatOpen').textContent = open.length;
+  document.getElementById('portStatClosed').textContent = closed.length;
+  document.getElementById('portTradeCount').textContent = `${portTrades.length} trade${portTrades.length !== 1 ? 's' : ''}`;
+
+  drawPortfolioChart(portTrades, 'portChartWrap', portfolioChartTimeframe);
+  renderPortfolioTradesTable(portTrades);
+}
+
+function drawPortfolioChart(portTrades, containerId, timeframe) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  let points = portTrades
+    .filter(t => t.status === 'closed' && t.pnl && t.date)
+    .map(t => ({ date: new Date(t.date), pnl: parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0 }))
+    .filter(t => !isNaN(t.date.getTime()))
+    .sort((a, b) => a.date - b.date);
+
+  if (timeframe !== 'all') {
+    const now = new Date();
+    let cutoff;
+    if (timeframe === '1m') cutoff = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    else if (timeframe === '3m') cutoff = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    else if (timeframe === 'ytd') cutoff = new Date(now.getFullYear(), 0, 1);
+    if (cutoff) points = points.filter(t => t.date >= cutoff);
+  }
+
+  if (!points.length) {
+    container.innerHTML = '<div class="port-chart-empty">No closed trades in this period — close some trades to see your performance chart</div>';
+    return;
+  }
+
+  let cum = 0;
+  const data = [{ date: new Date(points[0].date.getTime() - 86400000), value: 0 },
+    ...points.map(p => { cum += p.pnl; return { date: p.date, value: cum }; })];
+
+  const W = container.offsetWidth || 620;
+  const H = 180;
+  const pad = { top: 16, right: 16, bottom: 36, left: 58 };
+  const minV = Math.min(0, ...data.map(d => d.value));
+  const maxV = Math.max(0, ...data.map(d => d.value));
+  const range = maxV - minV || 1;
+  const minT = data[0].date.getTime();
+  const maxT = data[data.length - 1].date.getTime();
+  const tRange = maxT - minT || 1;
+
+  const cx = t => pad.left + ((t - minT) / tRange) * (W - pad.left - pad.right);
+  const cy = v => pad.top + (1 - (v - minV) / range) * (H - pad.top - pad.bottom);
+
+  const isPos = data[data.length - 1].value >= 0;
+  const col = isPos ? '#3fb950' : '#da3633';
+  const gid = 'pg' + Date.now();
+
+  const linePath = data.map((d, i) => `${i ? 'L' : 'M'}${cx(d.date.getTime()).toFixed(1)},${cy(d.value).toFixed(1)}`).join(' ');
+  const areaPath = linePath + ` L${cx(maxT).toFixed(1)},${cy(0).toFixed(1)} L${cx(minT).toFixed(1)},${cy(0).toFixed(1)}Z`;
+
+  const yTicks = [minV, minV + range / 2, maxV].map(v => ({ v, y: cy(v), label: (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(0) }));
+  const step = Math.max(1, Math.floor(data.length / 5));
+  const xTicks = data.filter((_, i) => i % step === 0 || i === data.length - 1)
+    .map(d => ({ x: cx(d.date.getTime()), label: d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }));
+
+  container.innerHTML = `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}">
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${col}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <line x1="${pad.left}" y1="${cy(0).toFixed(1)}" x2="${W - pad.right}" y2="${cy(0).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,3"/>
+    <path d="${areaPath}" fill="url(#${gid})"/>
+    <path d="${linePath}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${yTicks.map(t => `<text x="${pad.left - 6}" y="${t.y + 4}" text-anchor="end" font-size="10" fill="var(--text2)">${t.label}</text>`).join('')}
+    ${xTicks.map(t => `<text x="${t.x}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--text2)">${t.label}</text>`).join('')}
+  </svg>`;
+}
+
+function renderPortfolioTradesTable(portTrades) {
+  const tbody = document.getElementById('portTradesBody');
+  if (!tbody) return;
+  if (!portTrades.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No trades in this portfolio yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = portTrades.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt)).map(t => {
+    const pnlVal = parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0;
+    const pnlClass = pnlVal > 0 ? 'pnl-pos' : pnlVal < 0 ? 'pnl-neg' : '';
+    return `<tr>
+      <td><strong>${escHtml(t.symbol || '')}</strong></td>
+      <td>${t.assetType || 'stock'}</td>
+      <td><span class="badge badge-${t.direction === 'short' ? 'short' : 'long'}">${t.direction || 'long'}</span></td>
+      <td>${t.entryPrice ? '$' + t.entryPrice : '—'}</td>
+      <td>${t.exitPrice ? '$' + t.exitPrice : '—'}</td>
+      <td class="${pnlClass}">${t.pnl ? (pnlVal >= 0 ? '+' : '') + '$' + Math.abs(pnlVal).toFixed(2) : '—'}</td>
+      <td><span class="badge badge-${t.status === 'open' ? 'open' : 'closed'}">${t.status || 'open'}</span></td>
+      <td>${t.date || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function closePortfolioDetail() {
+  activePortfolioId = null;
+  document.getElementById('portfolioDetail').classList.add('hidden');
+  document.getElementById('portfolioOverview').classList.remove('hidden');
+}
+
+function showCreatePortfolioModal() {
+  document.getElementById('portModalTitle').textContent = 'New Portfolio';
+  document.getElementById('portNameInput').value = '';
+  document.getElementById('portDescInput').value = '';
+  document.getElementById('editPortfolioId').value = '';
+  document.querySelectorAll('.port-color-swatch').forEach((s, i) => s.classList.toggle('active', i === 0));
+  document.getElementById('createPortfolioModal').classList.remove('hidden');
+}
+
+function closeCreatePortfolioModal() {
+  document.getElementById('createPortfolioModal').classList.add('hidden');
+}
+
+async function savePortfolio() {
+  const name = document.getElementById('portNameInput').value.trim();
+  if (!name) { alert('Please enter a portfolio name'); return; }
+  const desc = document.getElementById('portDescInput').value.trim();
+  const color = document.querySelector('.port-color-swatch.active')?.dataset.color || '#1a56db';
+  const editId = document.getElementById('editPortfolioId').value;
+
+  const method = editId ? 'PUT' : 'POST';
+  const url = editId ? `/api/portfolios/${editId}` : '/api/portfolios';
+
+  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, description: desc, color }) });
+  if (!res.ok) { const e = await res.json(); alert(e.error || 'Error saving portfolio'); return; }
+
+  await loadPortfolios();
+  renderPortfoliosGrid();
+  closeCreatePortfolioModal();
+}
+
+async function deletePortfolio(portfolioId) {
+  if (!confirm('Delete this portfolio? The trades inside will not be deleted.')) return;
+  await fetch(`/api/portfolios/${portfolioId}`, { method: 'DELETE' });
+  if (activePortfolioId === portfolioId) closePortfolioDetail();
+  await loadPortfolios();
+  renderPortfoliosGrid();
+}
+
+function openAddTradeToPortfolio() {
+  const modal = document.getElementById('tradeModal');
+  if (modal) {
+    document.getElementById('modalSymbolInput').value = '';
+    document.querySelector('#tradeForm [name="date"]').value = new Date().toISOString().split('T')[0];
+    document.getElementById('editPortfolioTarget').value = activePortfolioId || '';
+    modal.classList.remove('hidden');
+  }
 }
 
 // ── OPTIONS CALCULATOR ───────────────────────────────────────────────────────

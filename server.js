@@ -23,11 +23,11 @@ async function connectDb() {
     const doc = await AppDataModel.findOne({});
     if (doc) {
       appDataCache = doc.data;
-      ['users','trades','notebooks','notes','brokers','savedArticles'].forEach(k => {
+      ['users','trades','notebooks','notes','brokers','savedArticles','portfolios'].forEach(k => {
         if (!appDataCache[k]) appDataCache[k] = [];
       });
     } else {
-      appDataCache = { users: [], trades: [], notebooks: [], notes: [], brokers: [], savedArticles: [] };
+      appDataCache = { users: [], trades: [], notebooks: [], notes: [], brokers: [], savedArticles: [], portfolios: [] };
       await AppDataModel.create({ data: appDataCache });
     }
     return true;
@@ -69,6 +69,7 @@ function initData() {
     if (!d.notebooks)      { d.notebooks = []; changed = true; }
     if (!d.brokers)        { d.brokers = []; changed = true; }
     if (!d.savedArticles)  { d.savedArticles = []; changed = true; }
+    if (!d.portfolios)     { d.portfolios = []; changed = true; }
     if (changed) fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2));
   }
 }
@@ -836,6 +837,44 @@ app.post('/api/trading/asset', requireAuth, async (req, res) => {
     if (!r.ok) return res.status(404).json({ error: 'Symbol not found or not tradeable on Alpaca' });
     res.json(r.data);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PORTFOLIOS ────────────────────────────────────────────────────────────────
+
+app.get('/api/portfolios', requireAuth, (req, res) => {
+  const data = readData();
+  res.json((data.portfolios || []).filter(p => p.userId === req.session.userId));
+});
+
+app.post('/api/portfolios', requireAuth, (req, res) => {
+  const { name, description, color } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+  const data = readData();
+  if (!data.portfolios) data.portfolios = [];
+  const p = {
+    id: uuidv4(), userId: req.session.userId,
+    name: name.trim(), description: description || '',
+    color: color || '#1a56db', createdAt: new Date().toISOString()
+  };
+  data.portfolios.push(p);
+  writeData(data);
+  res.json(p);
+});
+
+app.put('/api/portfolios/:id', requireAuth, (req, res) => {
+  const data = readData();
+  const idx = (data.portfolios || []).findIndex(p => p.id === req.params.id && p.userId === req.session.userId);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  data.portfolios[idx] = { ...data.portfolios[idx], ...req.body, id: req.params.id, userId: req.session.userId };
+  writeData(data);
+  res.json(data.portfolios[idx]);
+});
+
+app.delete('/api/portfolios/:id', requireAuth, (req, res) => {
+  const data = readData();
+  data.portfolios = (data.portfolios || []).filter(p => !(p.id === req.params.id && p.userId === req.session.userId));
+  writeData(data);
+  res.json({ ok: true });
 });
 
 // ─── AI CHAT API ──────────────────────────────────────────────────────────────
