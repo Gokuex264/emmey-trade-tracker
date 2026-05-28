@@ -55,7 +55,6 @@ async function showApp(user) {
   document.getElementById('sidebarUsername').textContent = user.username;
   const mobUser = document.getElementById('mobSidebarUsername');
   if (mobUser) mobUser.textContent = user.username;
-  document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   await loadTrades();
   await loadNotebooks();
@@ -71,7 +70,6 @@ async function showApp(user) {
   setupEventListeners();
   setupTickerPreviews();
 
-  document.querySelector('#quickTradeForm [name="date"]').value = new Date().toISOString().split('T')[0];
   document.querySelector('#tradeForm [name="date"]').value = new Date().toISOString().split('T')[0];
 }
 
@@ -320,45 +318,7 @@ function formatPnL(raw) {
 
 // ── DASHBOARD ───────────────────────────────────────────────────────────────
 function updateDashboard() {
-  const total = trades.length;
-  const openTrades = trades.filter(t => t.status === 'open' || !t.status);
-  const closedTrades = trades.filter(t => t.status === 'closed');
-
-  const closedWithPnl = closedTrades.filter(t => t.pnl);
-  const winning = closedWithPnl.filter(t => parseFloat(t.pnl.replace(/[^0-9.\-+]/g, '')) > 0);
-  const winRate = closedWithPnl.length ? Math.round((winning.length / closedWithPnl.length) * 100) : 0;
-
-  const totalPnL = closedWithPnl.reduce((sum, t) => {
-    const n = parseFloat(t.pnl.replace(/[^0-9.\-+]/g, ''));
-    return sum + (isNaN(n) ? 0 : n);
-  }, 0);
-
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-winrate').textContent = `${winRate}%`;
-  const pnlEl = document.getElementById('stat-pnl');
-  pnlEl.textContent = `${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}`;
-  pnlEl.style.color = totalPnL >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('stat-open').textContent = openTrades.length;
-
-  const recent = [...trades].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
-  const el = document.getElementById('recentTradesList');
-  if (!recent.length) {
-    el.innerHTML = '<div class="empty-state">No trades yet. Add your first trade!</div>';
-    return;
-  }
-  el.innerHTML = recent.map(t => `
-    <div class="recent-item">
-      <div style="display:flex;align-items:center;gap:8px">
-        ${tickerLogo(t.symbol, 30)}
-        <div>
-          <span class="recent-symbol">${t.symbol.toUpperCase()}</span>
-          <span class="badge badge-${t.assetType || 'stock'}" style="margin-left:6px">${(t.assetType || 'stock').toUpperCase()}</span>
-          <span class="badge badge-${t.direction || 'long'}" style="margin-left:4px">${(t.direction || 'long').toUpperCase()}</span>
-        </div>
-      </div>
-      <div>${formatPnL(t.pnl)}</div>
-    </div>`
-  ).join('');
+  renderPortfoliosGrid();
 }
 
 // ── TRADES TABLE ─────────────────────────────────────────────────────────────
@@ -932,7 +892,7 @@ function setupEventListeners() {
     b.addEventListener('click', () => document.getElementById('tradeModal').classList.add('hidden'));
   });
 
-  document.getElementById('quickTradeForm').addEventListener('submit', quickAddTrade);
+  document.getElementById('quickTradeForm')?.addEventListener('submit', quickAddTrade);
 
   document.getElementById('tradeSearch').addEventListener('input', renderTradesTable);
   document.getElementById('tradeStatusFilter').addEventListener('change', renderTradesTable);
@@ -1997,9 +1957,6 @@ function setupTickerPreviews() {
     document.getElementById('newsTickerInput'),
     document.getElementById('newsTickerBadge')
   );
-  // Quick add trade (dashboard)
-  const quickSymbol = document.querySelector('#quickTradeForm [name="symbol"]');
-  attachTickerPreview(quickSymbol, document.getElementById('quickTradeTickerBadge'));
   // Trade modal
   attachTickerPreview(
     document.getElementById('modalSymbolInput'),

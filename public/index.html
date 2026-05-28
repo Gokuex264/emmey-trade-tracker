@@ -111,7 +111,7 @@
       </div>
       <nav>
         <button class="nav-btn active" data-tab="dashboard">
-          <span>📊</span> Dashboard
+          <span>📁</span> Portfolios
         </button>
         <button class="nav-btn" data-tab="trades">
           <span>💼</span> Trades
@@ -136,9 +136,6 @@
         </button>
         <button class="nav-btn" data-tab="options">
           <span>🧮</span> Options Calc
-        </button>
-        <button class="nav-btn" data-tab="portfolios">
-          <span>📁</span> Portfolios
         </button>
       </nav>
       <div class="sidebar-footer">
@@ -170,7 +167,7 @@
       </div>
 
       <nav class="mob-sidebar-nav">
-        <button class="mob-sidebar-btn active" data-tab="dashboard"><span>📊</span> Dashboard</button>
+        <button class="mob-sidebar-btn active" data-tab="dashboard"><span>📁</span> Portfolios</button>
         <button class="mob-sidebar-btn" data-tab="trades"><span>💼</span> Trades</button>
         <button class="mob-sidebar-btn" data-tab="notebook"><span>📓</span> Notebook</button>
         <button class="mob-sidebar-btn" data-tab="charts"><span>📉</span> Charts</button>
@@ -179,7 +176,6 @@
         <button class="mob-sidebar-btn" data-tab="options"><span>🧮</span> Options Calc</button>
         <button class="mob-sidebar-btn" data-tab="brokers"><span>🔗</span> Brokers</button>
         <button class="mob-sidebar-btn" data-tab="trading"><span>⚡</span> Trading</button>
-        <button class="mob-sidebar-btn" data-tab="portfolios"><span>📁</span> Portfolios</button>
       </nav>
 
       <div class="mob-sidebar-footer">
@@ -192,75 +188,94 @@
     <!-- MAIN CONTENT -->
     <main class="main">
 
-      <!-- ── DASHBOARD ── -->
+      <!-- ── DASHBOARD / PORTFOLIOS ── -->
       <section id="tab-dashboard" class="tab active">
-        <div class="page-header">
-          <h1>Dashboard</h1>
-          <span class="date-display" id="dateDisplay"></span>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Total Trades</div>
-            <div class="stat-value" id="stat-total">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Win Rate</div>
-            <div class="stat-value" id="stat-winrate">0%</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Total P&amp;L</div>
-            <div class="stat-value" id="stat-pnl">$0.00</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Open Trades</div>
-            <div class="stat-value" id="stat-open">0</div>
-          </div>
-        </div>
-        <div class="dashboard-bottom">
-          <div class="recent-trades-card card">
-            <div class="card-header">
-              <h2>Recent Trades</h2>
-              <button class="btn-sm" onclick="showTab('trades')">View All</button>
+
+        <!-- Overview screen -->
+        <div id="portfolioOverview">
+          <div class="page-header">
+            <div>
+              <h1>Portfolios</h1>
+              <p style="color:var(--text2);font-size:13px;margin-top:2px">Organize and track multiple investment strategies</p>
             </div>
-            <div id="recentTradesList" class="recent-list"></div>
+            <button class="btn-primary" onclick="showCreatePortfolioModal()">+ New Portfolio</button>
           </div>
-          <div class="quick-add-card card">
-            <div class="card-header"><h2>Quick Add Trade</h2></div>
-            <form id="quickTradeForm" class="quick-form">
-              <div class="form-row">
-                <div class="ticker-input-wrap" style="flex:1">
-                  <input type="text" name="symbol" placeholder="Symbol (e.g. AAPL)" required style="width:100%" />
-                  <div class="ticker-live-badge hidden" id="quickTradeTickerBadge"></div>
-                </div>
-                <select name="assetType">
-                  <option value="stock">Stock</option>
-                  <option value="options">Options</option>
-                  <option value="futures">Futures</option>
-                  <option value="crypto">Crypto</option>
-                  <option value="forex">Forex</option>
-                </select>
+          <div id="portfolioGrid" class="portfolio-grid"></div>
+        </div>
+
+        <!-- Detail screen -->
+        <div id="portfolioDetail" class="hidden">
+          <div class="port-detail-topbar">
+            <button class="btn-back" onclick="closePortfolioDetail()">← Back</button>
+            <div style="display:flex;align-items:center;gap:10px;flex:1">
+              <div id="portDetailDot" class="port-color-dot"></div>
+              <h1 id="portDetailName" style="font-size:22px;font-weight:800;letter-spacing:-0.5px"></h1>
+            </div>
+            <button class="btn-primary" onclick="openAddTradeToPortfolio()">+ Add Trade</button>
+          </div>
+
+          <div class="port-stats-bar card">
+            <div class="port-stat">
+              <div class="port-stat-label">Realized P&amp;L</div>
+              <div class="port-stat-value" id="portStatPnl">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Win Rate</div>
+              <div class="port-stat-value" id="portStatWin">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Total Trades</div>
+              <div class="port-stat-value" id="portStatTotal">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Open Positions</div>
+              <div class="port-stat-value" id="portStatOpen">—</div>
+            </div>
+            <div class="port-stat-sep"></div>
+            <div class="port-stat">
+              <div class="port-stat-label">Closed Trades</div>
+              <div class="port-stat-value" id="portStatClosed">—</div>
+            </div>
+          </div>
+
+          <div class="card port-chart-card">
+            <div class="card-header">
+              <h2>Cumulative P&amp;L</h2>
+              <div class="port-tf-row">
+                <button class="port-tf-btn active" data-tf="all">All</button>
+                <button class="port-tf-btn" data-tf="3m">3M</button>
+                <button class="port-tf-btn" data-tf="1m">1M</button>
+                <button class="port-tf-btn" data-tf="ytd">YTD</button>
               </div>
-              <div class="form-row">
-                <select name="direction">
-                  <option value="long">Long</option>
-                  <option value="short">Short</option>
-                </select>
-                <input type="date" name="date" />
-              </div>
-              <div class="form-row">
-                <input type="text" name="entryPrice" placeholder="Price I bought at" required />
-                <input type="text" name="exitPrice" placeholder="Price I sold at" />
-              </div>
-              <div class="form-row">
-                <input type="text" name="pnl" placeholder="What I made / lost (e.g. +500)" />
-                <select name="status">
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-              <textarea name="reason" placeholder="Why I took this trade..." rows="2"></textarea>
-              <button type="submit" class="btn-primary">Add Trade</button>
-            </form>
+            </div>
+            <div id="portChartWrap" class="port-chart-wrap"></div>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <div class="card-header">
+              <h2>Positions</h2>
+              <span id="portTradeCount" style="font-size:12px;color:var(--text2)"></span>
+            </div>
+            <div class="table-wrapper" style="overflow-x:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Direction</th>
+                    <th>Entry</th>
+                    <th>Exit</th>
+                    <th>P&amp;L</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="portTradesBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -941,97 +956,6 @@
         </div>
       </section>
 
-      <!-- ── PORTFOLIOS ── -->
-      <section id="tab-portfolios" class="tab">
-
-        <!-- Overview screen -->
-        <div id="portfolioOverview">
-          <div class="page-header">
-            <div>
-              <h1>Portfolios</h1>
-              <p style="color:var(--text2);font-size:13px;margin-top:2px">Organize and track multiple investment strategies</p>
-            </div>
-            <button class="btn-primary" onclick="showCreatePortfolioModal()">+ New Portfolio</button>
-          </div>
-          <div id="portfolioGrid" class="portfolio-grid"></div>
-        </div>
-
-        <!-- Detail screen -->
-        <div id="portfolioDetail" class="hidden">
-          <div class="port-detail-topbar">
-            <button class="btn-back" onclick="closePortfolioDetail()">← Back</button>
-            <div style="display:flex;align-items:center;gap:10px;flex:1">
-              <div id="portDetailDot" class="port-color-dot"></div>
-              <h1 id="portDetailName" style="font-size:22px;font-weight:800;letter-spacing:-0.5px"></h1>
-            </div>
-            <button class="btn-primary" onclick="openAddTradeToPortfolio()">+ Add Trade</button>
-          </div>
-
-          <div class="port-stats-bar card">
-            <div class="port-stat">
-              <div class="port-stat-label">Realized P&amp;L</div>
-              <div class="port-stat-value" id="portStatPnl">—</div>
-            </div>
-            <div class="port-stat-sep"></div>
-            <div class="port-stat">
-              <div class="port-stat-label">Win Rate</div>
-              <div class="port-stat-value" id="portStatWin">—</div>
-            </div>
-            <div class="port-stat-sep"></div>
-            <div class="port-stat">
-              <div class="port-stat-label">Total Trades</div>
-              <div class="port-stat-value" id="portStatTotal">—</div>
-            </div>
-            <div class="port-stat-sep"></div>
-            <div class="port-stat">
-              <div class="port-stat-label">Open Positions</div>
-              <div class="port-stat-value" id="portStatOpen">—</div>
-            </div>
-            <div class="port-stat-sep"></div>
-            <div class="port-stat">
-              <div class="port-stat-label">Closed Trades</div>
-              <div class="port-stat-value" id="portStatClosed">—</div>
-            </div>
-          </div>
-
-          <div class="card port-chart-card">
-            <div class="card-header">
-              <h2>Cumulative P&amp;L</h2>
-              <div class="port-tf-row">
-                <button class="port-tf-btn active" data-tf="all">All</button>
-                <button class="port-tf-btn" data-tf="3m">3M</button>
-                <button class="port-tf-btn" data-tf="1m">1M</button>
-                <button class="port-tf-btn" data-tf="ytd">YTD</button>
-              </div>
-            </div>
-            <div id="portChartWrap" class="port-chart-wrap"></div>
-          </div>
-
-          <div class="card" style="margin-top:16px">
-            <div class="card-header">
-              <h2>Positions</h2>
-              <span id="portTradeCount" style="font-size:12px;color:var(--text2)"></span>
-            </div>
-            <div class="table-wrapper" style="overflow-x:auto">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Symbol</th>
-                    <th>Type</th>
-                    <th>Direction</th>
-                    <th>Entry</th>
-                    <th>Exit</th>
-                    <th>P&amp;L</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody id="portTradesBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
 
     </main>
 
