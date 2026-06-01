@@ -916,24 +916,51 @@ Guidelines:
   res.setHeader('Connection', 'keep-alive');
 
   try {
-    const client = new Anthropic({ apiKey });
-    const stream = await client.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: message }]
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: message }],
+        stream: true
+      })
     });
 
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+    if (!anthropicRes.ok) {
+      const errData = await anthropicRes.json().catch(() => ({}));
+      const errMsg = errData.error?.message || `Anthropic API error ${anthropicRes.status}`;
+      res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    for await (const chunk of anthropicRes.body) {
+      const text = decoder.decode(chunk);
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw || raw === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+            res.write(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`);
+          }
+        } catch (_) {}
       }
     }
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
-    console.error('Chat API error:', err.message);
-    res.write(`data: ${JSON.stringify({ error: err.message || 'Claude API error' })}\n\n`);
+    console.error('Chat error:', err.message);
+    res.write(`data: ${JSON.stringify({ error: 'Failed to reach AI service: ' + err.message })}\n\n`);
     res.write('data: [DONE]\n\n');
     res.end();
   }
