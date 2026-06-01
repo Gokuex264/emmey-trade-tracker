@@ -794,25 +794,33 @@ async function sendMessage() {
     const decoder = new TextDecoder();
     const bubbleEl = document.getElementById(`${aiId}-bubble`);
     let fullText = '';
+    let errorText = '';
+    let streamDone = false;
 
-    while (true) {
+    while (!streamDone) {
       const { done, value } = await reader.read();
       if (done) break;
       const chunk = decoder.decode(value);
       for (const line of chunk.split('\n')) {
         if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6);
-        if (data === '[DONE]') break;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') { streamDone = true; break; }
         try {
           const parsed = JSON.parse(data);
-          if (parsed.error) { bubbleEl.classList.remove('msg-streaming'); bubbleEl.textContent = '❌ Error: ' + parsed.error; break; }
+          if (parsed.error) { errorText = parsed.error; streamDone = true; break; }
           if (parsed.text) { fullText += parsed.text; bubbleEl.innerHTML = formatMarkdown(fullText); messagesEl.scrollTop = messagesEl.scrollHeight; }
         } catch (_) {}
       }
     }
 
     bubbleEl.classList.remove('msg-streaming');
-    bubbleEl.innerHTML = formatMarkdown(fullText);
+    if (errorText) {
+      bubbleEl.textContent = '❌ Error: ' + errorText;
+    } else if (fullText) {
+      bubbleEl.innerHTML = formatMarkdown(fullText);
+    } else {
+      bubbleEl.textContent = '❌ No response received — check your Anthropic API key on Render.';
+    }
   } catch (err) {
     const bubbleEl = document.getElementById(`${aiId}-bubble`);
     if (bubbleEl) { bubbleEl.classList.remove('msg-streaming'); bubbleEl.textContent = '❌ Network error: ' + err.message; }
