@@ -911,6 +911,10 @@ Guidelines:
 - Use plain language; avoid unnecessary jargon unless the user seems advanced
 - Format responses with headers and bullets when covering multiple points`;
 
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
   try {
     const client = new Anthropic({ apiKey });
     const stream = await client.messages.stream({
@@ -920,10 +924,6 @@ Guidelines:
       messages: [{ role: 'user', content: message }]
     });
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
     for await (const event of stream) {
       if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
@@ -932,7 +932,9 @@ Guidelines:
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
+    console.error('Chat API error:', err.message);
     res.write(`data: ${JSON.stringify({ error: err.message || 'Claude API error' })}\n\n`);
+    res.write('data: [DONE]\n\n');
     res.end();
   }
 });
