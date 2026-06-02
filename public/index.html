@@ -113,9 +113,7 @@
         <button class="nav-btn active" data-tab="dashboard">
           <span>📁</span> Portfolios
         </button>
-        <button class="nav-btn" data-tab="trades">
-          <span>💼</span> Trades
-        </button>
+
         <button class="nav-btn" data-tab="notebook">
           <span>📓</span> Notebook
         </button>
@@ -168,7 +166,6 @@
 
       <nav class="mob-sidebar-nav">
         <button class="mob-sidebar-btn active" data-tab="dashboard"><span>📁</span> Portfolios</button>
-        <button class="mob-sidebar-btn" data-tab="trades"><span>💼</span> Trades</button>
         <button class="mob-sidebar-btn" data-tab="notebook"><span>📓</span> Notebook</button>
         <button class="mob-sidebar-btn" data-tab="charts"><span>📉</span> Charts</button>
         <button class="mob-sidebar-btn" data-tab="news"><span>📰</span> News</button>
@@ -281,45 +278,6 @@
       </section>
 
       <!-- ── TRADES ── -->
-      <section id="tab-trades" class="tab">
-        <div class="page-header">
-          <h1>Trades</h1>
-          <button class="btn-primary" id="openTradeModal">+ New Trade</button>
-        </div>
-        <div class="filters card">
-          <input type="text" id="tradeSearch" placeholder="Search symbol..." />
-          <select id="tradeStatusFilter">
-            <option value="all">All Status</option>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
-          </select>
-          <select id="tradeDirFilter">
-            <option value="all">All Directions</option>
-            <option value="long">Long</option>
-            <option value="short">Short</option>
-          </select>
-        </div>
-        <div class="table-wrapper card">
-          <table id="tradesTable">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Type</th>
-                <th>Dir</th>
-                <th>Bought At</th>
-                <th>Sold At</th>
-                <th>P&amp;L</th>
-                <th>Why I Took It</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="tradesBody"></tbody>
-          </table>
-        </div>
-      </section>
-
       <!-- ── NOTEBOOK ── -->
       <section id="tab-notebook" class="tab">
 
@@ -1236,7 +1194,7 @@
         <p style="color:var(--text2)">Your selected trades have been added to your tracker.</p>
         <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
           <button class="btn-secondary close-import-modal">Close</button>
-          <button class="btn-primary" onclick="showTab('trades');closeImportModal()">View Trades →</button>
+          <button class="btn-primary" onclick="closeImportModal()">Done →</button>
         </div>
       </div>
 
