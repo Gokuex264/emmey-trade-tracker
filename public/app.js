@@ -323,6 +323,9 @@ function updateDashboard() {
 
 // ── TRADES TABLE ─────────────────────────────────────────────────────────────
 function renderTradesTable() {
+  const tbody = document.getElementById('tradesBody');
+  if (!tbody) return; // trades tab removed
+
   const search = (document.getElementById('tradeSearch')?.value || '').toLowerCase();
   const statusFilter = document.getElementById('tradeStatusFilter')?.value || 'all';
   const dirFilter = document.getElementById('tradeDirFilter')?.value || 'all';
@@ -334,7 +337,6 @@ function renderTradesTable() {
     return matchSearch && matchStatus && matchDir;
   });
 
-  const tbody = document.getElementById('tradesBody');
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No trades found</td></tr>';
     return;
@@ -418,11 +420,9 @@ async function saveTrade(e) {
     }
     document.getElementById('tradeModal').classList.add('hidden');
     document.getElementById('editPortfolioTarget').value = '';
-    updateDashboard();
-    renderTradesTable();
-    renderMyTradeSymbols();
     renderPortfoliosGrid();
     if (activePortfolioId) renderPortfolioDetail(activePortfolioId);
+    renderMyTradeSymbols();
   } catch (err) { alert('Error saving trade: ' + err.message); }
 }
 
