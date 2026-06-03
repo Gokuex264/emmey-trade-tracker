@@ -14,27 +14,49 @@ const AppDataModel = mongoose.model('AppData', AppDataSchema);
 
 let appDataCache = null;
 let usingMongo = false;
+const DB_KEYS = ['users','trades','notebooks','notes','brokers','savedArticles','portfolios'];
+
+// Reconnect automatically if MongoDB drops the connection
+mongoose.connection.on('disconnected', () => {
+  if (usingMongo) {
+    console.warn('⚠️  MongoDB disconnected — reconnecting…');
+    mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
+      .then(() => console.log('✅ MongoDB reconnected'))
+      .catch(err => console.error('❌ Reconnect failed:', err.message));
+  }
+});
+mongoose.connection.on('error', err => console.error('❌ MongoDB connection error:', err.message));
 
 async function connectDb() {
   if (!process.env.MONGODB_URI) return false;
-  try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ MongoDB connected');
-    const doc = await AppDataModel.findOne({});
-    if (doc) {
-      appDataCache = doc.data;
-      ['users','trades','notebooks','notes','brokers','savedArticles','portfolios'].forEach(k => {
-        if (!appDataCache[k]) appDataCache[k] = [];
-      });
-    } else {
-      appDataCache = { users: [], trades: [], notebooks: [], notes: [], brokers: [], savedArticles: [], portfolios: [] };
-      await AppDataModel.create({ data: appDataCache });
+
+  // Retry up to 3 times so a brief network blip at startup doesn't break the app
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
+      console.log('✅ MongoDB connected');
+
+      const doc = await AppDataModel.findOne({});
+      if (doc) {
+        appDataCache = doc.data;
+        // Only ADD missing keys — never delete or overwrite existing data
+        let changed = false;
+        DB_KEYS.forEach(k => { if (!appDataCache[k]) { appDataCache[k] = []; changed = true; } });
+        if (changed) await AppDataModel.findOneAndUpdate({}, { data: appDataCache }, { upsert: true });
+        console.log(`📦 Loaded: ${appDataCache.users.length} users, ${appDataCache.trades.length} trades, ${(appDataCache.portfolios||[]).length} portfolios`);
+      } else {
+        appDataCache = Object.fromEntries(DB_KEYS.map(k => [k, []]));
+        await AppDataModel.create({ data: appDataCache });
+        console.log('📦 Fresh database initialized');
+      }
+      return true;
+    } catch (err) {
+      console.error(`❌ MongoDB attempt ${attempt}/3 failed: ${err.message}`);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
     }
-    return true;
-  } catch (err) {
-    console.error('❌ MongoDB error:', err.message);
-    return false;
   }
+  console.error('❌ All MongoDB connection attempts failed — falling back to local file (data will not persist across restarts)');
+  return false;
 }
 
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
@@ -333,7 +355,14 @@ function writeData(data) {
   if (usingMongo) {
     appDataCache = data;
     AppDataModel.findOneAndUpdate({}, { data }, { upsert: true, new: true })
-      .catch(err => console.error('DB write error:', err));
+      .catch(err => {
+        console.error('❌ DB write failed, retrying…', err.message);
+        // Retry once after 1 second
+        setTimeout(() => {
+          AppDataModel.findOneAndUpdate({}, { data }, { upsert: true, new: true })
+            .catch(e => console.error('❌ DB write retry also failed — data may not be saved:', e.message));
+        }, 1000);
+      });
     return;
   }
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
@@ -350,10 +379,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
+  const mongoState = ['disconnected','connected','connecting','disconnecting'];
   res.json({
     status: 'ok',
-    database: usingMongo ? 'MongoDB connected ✅' : 'Using local file ⚠️ (data will reset on restart)',
-    mongoConfigured: !!process.env.MONGODB_URI
+    database: usingMongo ? '✅ MongoDB connected — data is safe' : '⚠️ Using local file — data will reset on restart',
+    mongoConfigured: !!process.env.MONGODB_URI,
+    mongoState: mongoState[mongoose.connection.readyState] || 'unknown',
+    recordCounts: usingMongo ? {
+      users: appDataCache?.users?.length || 0,
+      trades: appDataCache?.trades?.length || 0,
+      portfolios: appDataCache?.portfolios?.length || 0
+    } : null
   });
 });
 
