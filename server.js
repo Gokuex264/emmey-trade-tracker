@@ -7,7 +7,6 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const multer = require('multer');
 const mongoose = require('mongoose');
-const MongoStore = require('connect-mongo');
 
 // ── MONGODB SETUP ─────────────────────────────────────────────────────────────
 const AppDataSchema = new mongoose.Schema({ data: mongoose.Schema.Types.Mixed }, { collection: 'appdata' });
@@ -345,9 +344,6 @@ app.use(session({
   secret: process.env.emmey_trade_tracker || 'tradetracker-secret-2025',
   resave: false,
   saveUninitialized: false,
-  store: process.env.MONGODB_URI
-    ? MongoStore.create({ mongoUrl: process.env.MONGODB_URI, ttl: 7 * 24 * 60 * 60 })
-    : undefined,
   cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
