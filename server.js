@@ -14,6 +14,7 @@ const AppDataModel = mongoose.model('AppData', AppDataSchema);
 
 let appDataCache = null;
 let usingMongo = false;
+let lastDbError = null;
 const DB_KEYS = ['users','trades','notebooks','notes','brokers','savedArticles','portfolios'];
 
 // Reconnect automatically if MongoDB drops the connection
@@ -51,6 +52,7 @@ async function connectDb() {
       }
       return true;
     } catch (err) {
+      lastDbError = err.message;
       console.error(`❌ MongoDB attempt ${attempt}/3 failed: ${err.message}`);
       if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
     }
@@ -385,6 +387,7 @@ app.get('/api/health', (req, res) => {
     database: usingMongo ? '✅ MongoDB connected — data is safe' : '⚠️ Using local file — data will reset on restart',
     mongoConfigured: !!process.env.MONGODB_URI,
     mongoState: mongoState[mongoose.connection.readyState] || 'unknown',
+    lastError: lastDbError || null,
     recordCounts: usingMongo ? {
       users: appDataCache?.users?.length || 0,
       trades: appDataCache?.trades?.length || 0,
