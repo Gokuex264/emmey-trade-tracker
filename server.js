@@ -7,7 +7,6 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const multer = require('multer');
 const { Pool } = require('pg');
-const connectPgSimple = require('connect-pg-simple');
 
 // ── POSTGRESQL SETUP ──────────────────────────────────────────────────────────
 let pool = null;
@@ -376,11 +375,7 @@ function writeData(data) {
 
 app.use(express.json());
 
-const PgSession = connectPgSimple(session);
-const sessionStore = pool ? new PgSession({ pool, createTableIfMissing: true }) : undefined;
-
 app.use(session({
-  store: sessionStore,
   secret: process.env.emmey_trade_tracker || 'tradetracker-secret-2025',
   resave: false,
   saveUninitialized: false,
