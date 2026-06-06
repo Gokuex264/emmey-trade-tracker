@@ -6,58 +6,63 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const multer = require('multer');
-const mongoose = require('mongoose');
+const { Pool } = require('pg');
+const connectPgSimple = require('connect-pg-simple');
 
-// ── MONGODB SETUP ─────────────────────────────────────────────────────────────
-const AppDataSchema = new mongoose.Schema({ data: mongoose.Schema.Types.Mixed }, { collection: 'appdata' });
-const AppDataModel = mongoose.model('AppData', AppDataSchema);
-
+// ── POSTGRESQL SETUP ──────────────────────────────────────────────────────────
+let pool = null;
 let appDataCache = null;
-let usingMongo = false;
+let usingPg = false;
 let lastDbError = null;
 const DB_KEYS = ['users','trades','notebooks','notes','brokers','savedArticles','portfolios'];
 
-// Reconnect automatically if MongoDB drops the connection
-mongoose.connection.on('disconnected', () => {
-  if (usingMongo) {
-    console.warn('⚠️  MongoDB disconnected — reconnecting…');
-    mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
-      .then(() => console.log('✅ MongoDB reconnected'))
-      .catch(err => console.error('❌ Reconnect failed:', err.message));
-  }
-});
-mongoose.connection.on('error', err => console.error('❌ MongoDB connection error:', err.message));
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000
+  });
+  pool.on('error', err => console.error('❌ PostgreSQL pool error:', err.message));
+}
 
 async function connectDb() {
-  if (!process.env.MONGODB_URI) return false;
+  if (!pool) return false;
 
-  // Retry up to 3 times so a brief network blip at startup doesn't break the app
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
-      console.log('✅ MongoDB connected');
+      await pool.query('SELECT 1');
+      console.log('✅ PostgreSQL connected');
 
-      const doc = await AppDataModel.findOne({});
-      if (doc) {
-        appDataCache = doc.data;
-        // Only ADD missing keys — never delete or overwrite existing data
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS appdata (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          data JSONB NOT NULL,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+
+      const result = await pool.query('SELECT data FROM appdata WHERE id = 1');
+      if (result.rows.length > 0) {
+        appDataCache = result.rows[0].data;
         let changed = false;
         DB_KEYS.forEach(k => { if (!appDataCache[k]) { appDataCache[k] = []; changed = true; } });
-        if (changed) await AppDataModel.findOneAndUpdate({}, { data: appDataCache }, { upsert: true });
+        if (changed) await pool.query('UPDATE appdata SET data = $1, updated_at = NOW() WHERE id = 1', [JSON.stringify(appDataCache)]);
         console.log(`📦 Loaded: ${appDataCache.users.length} users, ${appDataCache.trades.length} trades, ${(appDataCache.portfolios||[]).length} portfolios`);
       } else {
         appDataCache = Object.fromEntries(DB_KEYS.map(k => [k, []]));
-        await AppDataModel.create({ data: appDataCache });
+        await pool.query('INSERT INTO appdata (id, data) VALUES (1, $1)', [JSON.stringify(appDataCache)]);
         console.log('📦 Fresh database initialized');
       }
       return true;
     } catch (err) {
       lastDbError = err.message;
-      console.error(`❌ MongoDB attempt ${attempt}/3 failed: ${err.message}`);
+      console.error(`❌ PostgreSQL attempt ${attempt}/3 failed: ${err.message}`);
       if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
     }
   }
-  console.error('❌ All MongoDB connection attempts failed — falling back to local file (data will not persist across restarts)');
+  console.error('❌ All PostgreSQL connection attempts failed — falling back to local file');
   return false;
 }
 
@@ -348,21 +353,20 @@ function normalizeAlpacaPositions(positions) {
 }
 
 function readData() {
-  if (usingMongo) return JSON.parse(JSON.stringify(appDataCache));
+  if (usingPg) return JSON.parse(JSON.stringify(appDataCache));
   initData();
   return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
 }
 
 function writeData(data) {
-  if (usingMongo) {
+  if (usingPg) {
     appDataCache = data;
-    AppDataModel.findOneAndUpdate({}, { data }, { upsert: true, new: true })
+    pool.query('UPDATE appdata SET data = $1, updated_at = NOW() WHERE id = 1', [JSON.stringify(data)])
       .catch(err => {
         console.error('❌ DB write failed, retrying…', err.message);
-        // Retry once after 1 second
         setTimeout(() => {
-          AppDataModel.findOneAndUpdate({}, { data }, { upsert: true, new: true })
-            .catch(e => console.error('❌ DB write retry also failed — data may not be saved:', e.message));
+          pool.query('UPDATE appdata SET data = $1, updated_at = NOW() WHERE id = 1', [JSON.stringify(data)])
+            .catch(e => console.error('❌ DB write retry also failed:', e.message));
         }, 1000);
       });
     return;
@@ -371,7 +375,12 @@ function writeData(data) {
 }
 
 app.use(express.json());
+
+const PgSession = connectPgSimple(session);
+const sessionStore = pool ? new PgSession({ pool, createTableIfMissing: true }) : undefined;
+
 app.use(session({
+  store: sessionStore,
   secret: process.env.emmey_trade_tracker || 'tradetracker-secret-2025',
   resave: false,
   saveUninitialized: false,
@@ -381,14 +390,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  const mongoState = ['disconnected','connected','connecting','disconnecting'];
   res.json({
     status: 'ok',
-    database: usingMongo ? '✅ MongoDB connected — data is safe' : '⚠️ Using local file — data will reset on restart',
-    mongoConfigured: !!process.env.MONGODB_URI,
-    mongoState: mongoState[mongoose.connection.readyState] || 'unknown',
+    database: usingPg ? '✅ PostgreSQL (Supabase) connected — data is safe' : '⚠️ Using local file — data will reset on restart',
+    dbConfigured: !!process.env.DATABASE_URL,
+    usingPostgres: usingPg,
     lastError: lastDbError || null,
-    recordCounts: usingMongo ? {
+    recordCounts: usingPg ? {
       users: appDataCache?.users?.length || 0,
       trades: appDataCache?.trades?.length || 0,
       portfolios: appDataCache?.portfolios?.length || 0
@@ -1015,8 +1023,8 @@ Guidelines:
 });
 
 connectDb().then(ok => {
-  usingMongo = ok;
-  if (!ok) console.log('⚠️  No MONGODB_URI set — using local data.json');
+  usingPg = ok;
+  if (!ok) console.log('⚠️  No DATABASE_URL set — using local data.json');
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n✅ Trade Tracker running at http://localhost:${PORT}\n`);
   });
