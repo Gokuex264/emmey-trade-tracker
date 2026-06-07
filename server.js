@@ -956,16 +956,61 @@ You can help with:
 3. ECONOMIC CONCEPTS — explain macroeconomics: inflation, interest rates, yield curves, GDP, monetary policy, sector rotation, etc.
 4. STOCK/ASSET RESEARCH — discuss fundamentals, technicals, sector trends, and trading setups for any symbol
 5. STRATEGY & EDUCATION — explain trading strategies, risk management, options, futures, crypto concepts
+6. CHARTS & VISUALIZATIONS — use the generate_chart tool to show visual data whenever it would be helpful
 
 User's trade data:${tradeContext}
 
 Guidelines:
 - When analyzing trades, reference specific symbols and dates from the data above
+- When showing trade performance, P&L breakdowns, win rates, or comparisons — use generate_chart to visualize it
+- Use "stats" chart type for key summary numbers, "bar" for comparisons, "line" for trends over time, "pie"/"donut" for distributions
 - For news/economic questions, give clear context on WHY it matters to markets and HOW it typically affects prices
 - Always clarify if information may be outdated (your training data has a cutoff)
 - Be direct, specific, and actionable — avoid generic advice
-- Use plain language; avoid unnecessary jargon unless the user seems advanced
 - Format responses with headers and bullets when covering multiple points`;
+
+  const chartTool = {
+    name: 'generate_chart',
+    description: 'Render a visual chart or data visualization inline in the chat. Use this proactively when showing trade performance, P&L data, win rates, distributions, or any numerical comparison. Prefer visual output over plain numbers when data has 2+ items.',
+    input_schema: {
+      type: 'object',
+      required: ['chart_type', 'title'],
+      properties: {
+        chart_type: {
+          type: 'string',
+          enum: ['bar', 'line', 'pie', 'donut', 'stats'],
+          description: 'bar=comparisons, line=trends over time, pie/donut=distribution/ratios, stats=key numbers'
+        },
+        title: { type: 'string', description: 'Chart title shown above the visualization' },
+        labels: {
+          type: 'array', items: { type: 'string' },
+          description: 'Category labels (bar: each bar, pie: each slice, line: x-axis points)'
+        },
+        values: {
+          type: 'array', items: { type: 'number' },
+          description: 'Data values matching labels. For bar/pie/donut charts.'
+        },
+        colors: {
+          type: 'array', items: { type: 'string' },
+          description: 'Optional hex colors per bar/slice. Use green (#3fb950) for positive, red (#da3633) for negative.'
+        },
+        y_label: { type: 'string', description: 'Y-axis label (e.g. "P&L ($)", "Trade Count")' },
+        stats: {
+          type: 'array',
+          description: 'For stats chart type — array of key metric cards',
+          items: {
+            type: 'object',
+            required: ['label', 'value'],
+            properties: {
+              label: { type: 'string' },
+              value: { type: 'string' },
+              color: { type: 'string', description: 'Optional color: green, red, blue, yellow, or hex' }
+            }
+          }
+        }
+      }
+    }
+  };
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -981,8 +1026,9 @@ Guidelines:
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: systemPrompt,
+        tools: [chartTool],
         messages: [{ role: 'user', content: message }],
         stream: true
       })
@@ -998,6 +1044,10 @@ Guidelines:
     }
 
     const decoder = new TextDecoder();
+    let toolInput = '';
+    let inToolUse = false;
+    let toolName = '';
+
     for await (const chunk of anthropicRes.body) {
       const text = decoder.decode(chunk);
       for (const line of text.split('\n')) {
@@ -1006,8 +1056,27 @@ Guidelines:
         if (!raw || raw === '[DONE]') continue;
         try {
           const parsed = JSON.parse(raw);
-          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-            res.write(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`);
+
+          if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
+            inToolUse = true;
+            toolName = parsed.content_block.name;
+            toolInput = '';
+          } else if (parsed.type === 'content_block_delta') {
+            if (parsed.delta?.type === 'text_delta') {
+              res.write(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`);
+            } else if (parsed.delta?.type === 'input_json_delta' && inToolUse) {
+              toolInput += parsed.delta.partial_json || '';
+            }
+          } else if (parsed.type === 'content_block_stop' && inToolUse) {
+            inToolUse = false;
+            if (toolName === 'generate_chart') {
+              try {
+                const chartData = JSON.parse(toolInput);
+                res.write(`data: ${JSON.stringify({ chart: chartData })}\n\n`);
+              } catch (_) {}
+            }
+            toolInput = '';
+            toolName = '';
           }
         } catch (_) {}
       }

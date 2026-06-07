@@ -801,6 +801,7 @@ async function sendMessage() {
     let fullText = '';
     let errorText = '';
     let streamDone = false;
+    let hasContent = false;
 
     while (!streamDone) {
       const { done, value } = await reader.read();
@@ -813,7 +814,20 @@ async function sendMessage() {
         try {
           const parsed = JSON.parse(data);
           if (parsed.error) { errorText = parsed.error; streamDone = true; break; }
-          if (parsed.text) { fullText += parsed.text; bubbleEl.innerHTML = formatMarkdown(fullText); messagesEl.scrollTop = messagesEl.scrollHeight; }
+          if (parsed.text) {
+            fullText += parsed.text;
+            bubbleEl.innerHTML = formatMarkdown(fullText);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            hasContent = true;
+          }
+          if (parsed.chart) {
+            const chartEl = document.createElement('div');
+            chartEl.className = 'chat-chart';
+            chartEl.innerHTML = renderChatChart(parsed.chart);
+            bubbleEl.appendChild(chartEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            hasContent = true;
+          }
         } catch (_) {}
       }
     }
@@ -821,9 +835,7 @@ async function sendMessage() {
     bubbleEl.classList.remove('msg-streaming');
     if (errorText) {
       bubbleEl.textContent = '❌ Error: ' + errorText;
-    } else if (fullText) {
-      bubbleEl.innerHTML = formatMarkdown(fullText);
-    } else {
+    } else if (!hasContent) {
       bubbleEl.textContent = '❌ No response received — check your Anthropic API key on Render.';
     }
   } catch (err) {
@@ -843,6 +855,168 @@ function formatMarkdown(text) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/\n/g, '<br>');
+}
+
+// ── CHAT CHART RENDERER ───────────────────────────────────────────────────────
+function renderChatChart(c) {
+  const type = c.chart_type || 'bar';
+  if (type === 'stats') return renderStatsChart(c);
+  if (type === 'pie' || type === 'donut') return renderPieChart(c, type === 'donut');
+  if (type === 'line') return renderLineChart(c);
+  return renderBarChart(c);
+}
+
+function chtEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderStatsChart(c) {
+  const stats = c.stats || [];
+  const colorMap = { green:'#3fb950', red:'#da3633', blue:'#7eb8ff', yellow:'#e3b341', white:'#e6edf3' };
+  const cards = stats.map(s => {
+    const col = colorMap[s.color] || s.color || '#e6edf3';
+    return `<div class="cc-stat-card"><div class="cc-stat-val" style="color:${col}">${chtEsc(s.value)}</div><div class="cc-stat-lbl">${chtEsc(s.label)}</div></div>`;
+  }).join('');
+  return `<div class="cc-wrap"><div class="cc-title">${chtEsc(c.title)}</div><div class="cc-stats-grid">${cards}</div></div>`;
+}
+
+function renderBarChart(c) {
+  const labels = c.labels || [];
+  const values = c.values || [];
+  if (!labels.length || !values.length) return `<div class="cc-wrap"><div class="cc-title">${chtEsc(c.title)}</div><div class="cc-empty">No data</div></div>`;
+
+  const W = 520, H = 220, padL = 58, padR = 16, padT = 20, padB = 48;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const maxV = Math.max(...values.map(Math.abs), 0.01);
+  const minV = Math.min(0, ...values);
+  const range = Math.max(...values) - minV || maxV;
+
+  const barW = Math.max(8, Math.floor(innerW / labels.length) - 6);
+  const gap  = (innerW - barW * labels.length) / (labels.length + 1);
+
+  const cy = v => padT + (1 - (v - minV) / range) * innerH;
+  const zeroY = cy(0);
+
+  const PALETTE = ['#1a56db','#3fb950','#da3633','#e3b341','#b088f9','#7eb8ff','#fb8f44','#63e6be'];
+
+  const bars = labels.map((lbl, i) => {
+    const v = values[i] || 0;
+    const col = c.colors?.[i] || (v >= 0 ? '#3fb950' : '#da3633');
+    const x = padL + gap + i * (barW + gap);
+    const barH = Math.abs((v / range) * innerH);
+    const y = v >= 0 ? zeroY - barH : zeroY;
+    const shortLbl = lbl.length > 6 ? lbl.slice(0,5)+'…' : lbl;
+    const valLabel = v >= 0 ? `+${v % 1 === 0 ? v : v.toFixed(2)}` : (v % 1 === 0 ? v : v.toFixed(2));
+    return `<rect x="${x}" y="${y.toFixed(1)}" width="${barW}" height="${Math.max(2,barH).toFixed(1)}" fill="${col}" rx="3"/>
+      <text x="${(x+barW/2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="#8b949e">${valLabel}</text>
+      <text x="${(x+barW/2).toFixed(1)}" y="${(H - padB + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="#8b949e">${chtEsc(shortLbl)}</text>`;
+  }).join('');
+
+  const yTicks = [minV, minV + range/2, minV + range].map(v => ({
+    v, y: cy(v), lbl: (v >= 0 ? '' : '') + (Math.abs(v) >= 1000 ? (v/1000).toFixed(1)+'k' : v % 1 === 0 ? v : v.toFixed(1))
+  }));
+
+  const yLabel = c.y_label ? `<text x="12" y="${(padT + innerH/2).toFixed(1)}" text-anchor="middle" font-size="10" fill="#8b949e" transform="rotate(-90,12,${(padT + innerH/2).toFixed(1)})">${chtEsc(c.y_label)}</text>` : '';
+
+  return `<div class="cc-wrap">
+    <div class="cc-title">${chtEsc(c.title)}</div>
+    <svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">
+      ${yTicks.map(t => `<line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W-padR}" y2="${t.y.toFixed(1)}" stroke="#21262d" stroke-width="1"/>
+        <text x="${padL-6}" y="${(t.y+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#8b949e">${t.lbl}</text>`).join('')}
+      ${minV < 0 ? `<line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W-padR}" y2="${zeroY.toFixed(1)}" stroke="#30363d" stroke-width="1.5"/>` : ''}
+      ${bars}
+      ${yLabel}
+    </svg>
+  </div>`;
+}
+
+function renderLineChart(c) {
+  const labels = c.labels || [];
+  const values = c.values || [];
+  if (!labels.length || !values.length) return `<div class="cc-wrap"><div class="cc-title">${chtEsc(c.title)}</div><div class="cc-empty">No data</div></div>`;
+
+  const W = 520, H = 200, padL = 58, padR = 16, padT = 20, padB = 36;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const minV = Math.min(0, ...values), maxV = Math.max(...values, 0.01);
+  const range = maxV - minV || 1;
+
+  const cx = i => padL + (i / (labels.length - 1 || 1)) * innerW;
+  const cy = v => padT + (1 - (v - minV) / range) * innerH;
+  const isPos = values[values.length - 1] >= 0;
+  const col = isPos ? '#3fb950' : '#da3633';
+  const gid = 'lg' + Math.random().toString(36).slice(2);
+
+  const pts = values.map((v, i) => `${cx(i).toFixed(1)},${cy(v).toFixed(1)}`);
+  const linePath = 'M' + pts.join(' L');
+  const areaPath = linePath + ` L${cx(values.length-1).toFixed(1)},${cy(0).toFixed(1)} L${cx(0).toFixed(1)},${cy(0).toFixed(1)}Z`;
+
+  const zeroY = cy(0);
+  const step = Math.max(1, Math.floor(labels.length / 5));
+  const xTicks = labels.filter((_, i) => i % step === 0 || i === labels.length - 1)
+    .map((lbl, _, arr) => {
+      const i = labels.indexOf(lbl);
+      return `<text x="${cx(i).toFixed(1)}" y="${H - padB + 16}" text-anchor="middle" font-size="10" fill="#8b949e">${chtEsc(lbl.length > 7 ? lbl.slice(0,6)+'…' : lbl)}</text>`;
+    }).join('');
+
+  const yTicks = [minV, minV + range/2, maxV].map(v => {
+    const lbl = (v >= 0 ? '+' : '') + (Math.abs(v) >= 1000 ? (v/1000).toFixed(1)+'k' : v.toFixed(0));
+    return `<line x1="${padL}" y1="${cy(v).toFixed(1)}" x2="${W-padR}" y2="${cy(v).toFixed(1)}" stroke="#21262d" stroke-width="1"/>
+      <text x="${padL-6}" y="${(cy(v)+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#8b949e">${lbl}</text>`;
+  }).join('');
+
+  return `<div class="cc-wrap">
+    <div class="cc-title">${chtEsc(c.title)}</div>
+    <svg width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${col}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+      </linearGradient></defs>
+      ${yTicks}
+      <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W-padR}" y2="${zeroY.toFixed(1)}" stroke="#30363d" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <path d="${areaPath}" fill="url(#${gid})"/>
+      <path d="${linePath}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${xTicks}
+    </svg>
+  </div>`;
+}
+
+function renderPieChart(c, isDonut) {
+  const labels = c.labels || [];
+  const values = c.values || [];
+  if (!labels.length || !values.length) return `<div class="cc-wrap"><div class="cc-title">${chtEsc(c.title)}</div><div class="cc-empty">No data</div></div>`;
+
+  const PALETTE = ['#1a56db','#3fb950','#e3b341','#da3633','#b088f9','#7eb8ff','#fb8f44','#63e6be'];
+  const total = values.reduce((a, b) => a + Math.abs(b), 0) || 1;
+  const R = 80, cx = 110, cy = 100, innerR = isDonut ? 38 : 0;
+
+  let angle = -Math.PI / 2;
+  const slices = values.map((v, i) => {
+    const frac = Math.abs(v) / total;
+    const sweep = frac * 2 * Math.PI;
+    const x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle);
+    angle += sweep;
+    const x2 = cx + R * Math.cos(angle), y2 = cy + R * Math.sin(angle);
+    const large = sweep > Math.PI ? 1 : 0;
+    const col = c.colors?.[i] || PALETTE[i % PALETTE.length];
+    const path = isDonut
+      ? `M${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} L${(cx+innerR*Math.cos(angle)).toFixed(2)},${(cy+innerR*Math.sin(angle)).toFixed(2)} A${innerR},${innerR} 0 ${large},0 ${(cx+innerR*Math.cos(angle-sweep)).toFixed(2)},${(cy+innerR*Math.sin(angle-sweep)).toFixed(2)}Z`
+      : `M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)}Z`;
+    return { path, col, frac, label: labels[i], value: v };
+  });
+
+  const legendItems = slices.map(s =>
+    `<div class="cc-legend-item"><span class="cc-legend-dot" style="background:${s.col}"></span><span>${chtEsc(s.label)}</span><span style="margin-left:auto;color:#8b949e">${(s.frac*100).toFixed(1)}%</span></div>`
+  ).join('');
+
+  return `<div class="cc-wrap">
+    <div class="cc-title">${chtEsc(c.title)}</div>
+    <div class="cc-pie-layout">
+      <svg width="220" height="200" viewBox="0 0 220 200">
+        ${slices.map(s => `<path d="${s.path}" fill="${s.col}" stroke="#161b22" stroke-width="2"/>`).join('')}
+        ${isDonut ? `<text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="13" font-weight="bold" fill="#e6edf3">${total % 1 === 0 ? total : total.toFixed(1)}</text>` : ''}
+      </svg>
+      <div class="cc-legend">${legendItems}</div>
+    </div>
+  </div>`;
 }
 
 // ── EVENT LISTENERS ──────────────────────────────────────────────────────────
