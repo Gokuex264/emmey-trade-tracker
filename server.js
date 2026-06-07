@@ -19,9 +19,9 @@ if (process.env.DATABASE_URL) {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    max: 10,
+    max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000
+    connectionTimeoutMillis: 5000
   });
   pool.on('error', err => console.error('❌ PostgreSQL pool error:', err.message));
 }
@@ -1017,10 +1017,14 @@ Guidelines:
   }
 });
 
+// Start server immediately so Render health checks pass
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n✅ Trade Tracker running at http://localhost:${PORT}\n`);
+});
+
+// Connect to database in background after server is up
 connectDb().then(ok => {
   usingPg = ok;
-  if (!ok) console.log('⚠️  No DATABASE_URL set — using local data.json');
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n✅ Trade Tracker running at http://localhost:${PORT}\n`);
-  });
+  if (!ok) console.log('⚠️  No DATABASE_URL set or DB failed — using local data.json');
+  else console.log('🎉 PostgreSQL ready — all data will persist');
 });
