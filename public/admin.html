@@ -52,22 +52,71 @@
     }
     .btn-logout:hover { background: #21262d; }
 
-    /* ── LAYOUT ── */
-    .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
-
-    /* ── NOT ADMIN GATE ── */
-    #accessDenied {
-      display: flex;
-      flex-direction: column;
+    /* ── ADMIN PASSWORD GATE ── */
+    #adminGate {
+      display: none;
+      min-height: calc(100vh - 56px);
       align-items: center;
       justify-content: center;
-      min-height: 70vh;
-      gap: 16px;
+    }
+    #adminGate.show { display: flex; }
+    .gate-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
       text-align: center;
     }
-    #accessDenied h2 { color: #f85149; font-size: 1.5rem; }
-    #accessDenied p { color: #8b949e; max-width: 360px; }
-    #accessDenied a { color: #7eb8ff; text-decoration: none; }
+    .gate-icon { font-size: 40px; margin-bottom: 12px; }
+    .gate-box h2 { font-size: 1.25rem; color: #e6edf3; margin-bottom: 6px; }
+    .gate-box p { color: #8b949e; font-size: 0.83rem; margin-bottom: 24px; }
+    .gate-input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #c9d1d9;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      outline: none;
+      text-align: center;
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+      transition: border-color 0.15s;
+    }
+    .gate-input:focus { border-color: #238636; }
+    .gate-btn {
+      width: 100%;
+      background: #238636;
+      color: #fff;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .gate-btn:hover { background: #2ea043; }
+    .gate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .gate-error {
+      background: #3d1a1a;
+      border: 1px solid #da3633;
+      border-radius: 6px;
+      color: #f85149;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      margin-bottom: 12px;
+      display: none;
+      text-align: left;
+    }
+    .gate-attempts { font-size: 0.75rem; color: #8b949e; margin-top: 10px; }
+
+    /* ── LAYOUT ── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
 
     /* ── STATS GRID ── */
     .stats-grid {
@@ -155,16 +204,6 @@
       padding: 1px 8px;
       font-size: 0.75rem;
       color: #8b949e;
-    }
-    .badge-admin {
-      display: inline-block;
-      background: #1a4228;
-      border: 1px solid #238636;
-      border-radius: 20px;
-      padding: 1px 8px;
-      font-size: 0.72rem;
-      color: #3fb950;
-      margin-left: 6px;
     }
     .date-text { color: #8b949e; font-size: 0.78rem; }
 
@@ -279,10 +318,8 @@
     }
     .btn-danger:hover { background: #f85149; }
 
-    /* ── EMPTY ── */
+    /* ── EMPTY / LOADING ── */
     .empty { text-align: center; padding: 40px; color: #8b949e; font-size: 0.9rem; }
-
-    /* ── LOADING ── */
     .loading { text-align: center; padding: 60px; color: #8b949e; }
     .spinner {
       display: inline-block;
@@ -307,19 +344,32 @@
   </div>
   <div class="header-right">
     <span class="admin-username" id="adminName"></span>
-    <button class="btn-logout" onclick="logout()">Log Out</button>
+    <button class="btn-logout" id="adminLogoutBtn" onclick="adminLogout()" style="display:none">Lock Admin</button>
     <a href="/" style="color:#7eb8ff;font-size:0.82rem;text-decoration:none;">← App</a>
   </div>
 </div>
 
-<!-- Access denied -->
-<div id="accessDenied" class="hidden">
-  <h2>403 — Admin Access Required</h2>
-  <p>You must be logged in as the admin account to view this page.</p>
-  <a href="/">← Back to TradeTracker</a>
+<!-- ── ADMIN PASSWORD GATE ── -->
+<div id="adminGate">
+  <div class="gate-box">
+    <div class="gate-icon">🔐</div>
+    <h2>Admin Access</h2>
+    <p>Enter the admin password to continue.<br/>This page is private — only you have access.</p>
+    <div class="gate-error" id="gateError"></div>
+    <input
+      class="gate-input"
+      type="password"
+      id="gatePassword"
+      placeholder="Admin password"
+      autocomplete="current-password"
+      onkeydown="if(event.key==='Enter') submitAdminLogin()"
+    />
+    <button class="gate-btn" id="gateBtn" onclick="submitAdminLogin()">Unlock Admin</button>
+    <div class="gate-attempts" id="gateAttempts"></div>
+  </div>
 </div>
 
-<!-- Main content -->
+<!-- ── MAIN DASHBOARD ── -->
 <div id="mainContent" class="container hidden">
 
   <!-- Stats -->
@@ -421,6 +471,8 @@
   let allUsers = [];
   let currentEditId = null;
   let currentDelId = null;
+  let gateFailures = 0;
+  const MAX_GATE_ATTEMPTS = 5;
 
   async function api(path, opts = {}) {
     const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -429,32 +481,97 @@
   }
 
   async function init() {
+    const check = await api('/api/admin/check');
+    if (check.data.authed) {
+      showDashboard();
+    } else {
+      document.getElementById('adminGate').classList.add('show');
+      setTimeout(() => document.getElementById('gatePassword').focus(), 100);
+    }
+  }
+
+  // ── GATE ──
+  async function submitAdminLogin() {
+    if (gateFailures >= MAX_GATE_ATTEMPTS) return;
+
+    const pwd = document.getElementById('gatePassword').value;
+    const errEl = document.getElementById('gateError');
+    const btn = document.getElementById('gateBtn');
+    errEl.style.display = 'none';
+
+    if (!pwd) { showGateErr('Enter the admin password'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Verifying…';
+
+    const r = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: pwd }) });
+
+    if (r.ok) {
+      document.getElementById('adminGate').classList.remove('show');
+      showDashboard();
+    } else {
+      gateFailures++;
+      const left = MAX_GATE_ATTEMPTS - gateFailures;
+      if (left <= 0) {
+        showGateErr('Too many failed attempts. Refresh the page to try again.');
+        btn.disabled = true;
+        btn.textContent = 'Locked';
+        document.getElementById('gatePassword').disabled = true;
+        document.getElementById('gateAttempts').textContent = '';
+      } else {
+        showGateErr(r.data.error || 'Incorrect password');
+        document.getElementById('gateAttempts').textContent = `${left} attempt${left === 1 ? '' : 's'} remaining`;
+        btn.disabled = false;
+        btn.textContent = 'Unlock Admin';
+        document.getElementById('gatePassword').value = '';
+        document.getElementById('gatePassword').focus();
+      }
+    }
+  }
+
+  function showGateErr(msg) {
+    const el = document.getElementById('gateError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  async function adminLogout() {
+    await api('/api/admin/logout', { method: 'POST' });
+    document.getElementById('mainContent').classList.add('hidden');
+    document.getElementById('adminLogoutBtn').style.display = 'none';
+    document.getElementById('adminName').textContent = '';
+    gateFailures = 0;
+    document.getElementById('gatePassword').value = '';
+    document.getElementById('gatePassword').disabled = false;
+    document.getElementById('gateBtn').disabled = false;
+    document.getElementById('gateBtn').textContent = 'Unlock Admin';
+    document.getElementById('gateError').style.display = 'none';
+    document.getElementById('gateAttempts').textContent = '';
+    document.getElementById('adminGate').classList.add('show');
+    setTimeout(() => document.getElementById('gatePassword').focus(), 100);
+  }
+
+  // ── DASHBOARD ──
+  async function showDashboard() {
     const me = await api('/api/me');
-    if (!me.ok || !me.data.loggedIn) {
-      document.getElementById('accessDenied').classList.remove('hidden');
-      return;
+    if (me.data.loggedIn) {
+      document.getElementById('adminName').textContent = me.data.username;
     }
-
-    // Try to load stats — 403 means not admin
-    const stats = await api('/api/admin/stats');
-    if (!stats.ok) {
-      document.getElementById('accessDenied').classList.remove('hidden');
-      return;
-    }
-
-    document.getElementById('adminName').textContent = me.data.username;
+    document.getElementById('adminLogoutBtn').style.display = 'inline-block';
     document.getElementById('mainContent').classList.remove('hidden');
-    renderStats(stats.data);
+
+    const stats = await api('/api/admin/stats');
+    if (stats.ok) renderStats(stats.data);
     loadUsers();
   }
 
   function renderStats(s) {
     document.getElementById('statsGrid').innerHTML = [
-      { label: 'Total Users',      value: s.totalUsers },
-      { label: 'Total Trades',     value: s.totalTrades },
-      { label: 'Total Portfolios', value: s.totalPortfolios },
-      { label: 'Total Notebooks',  value: s.totalNotebooks },
-      { label: 'Total Notes',      value: s.totalNotes },
+      { label: 'Total Users',        value: s.totalUsers },
+      { label: 'Total Trades',       value: s.totalTrades },
+      { label: 'Total Portfolios',   value: s.totalPortfolios },
+      { label: 'Total Notebooks',    value: s.totalNotebooks },
+      { label: 'Total Notes',        value: s.totalNotes },
       { label: 'Broker Connections', value: s.totalBrokers },
     ].map(c => `
       <div class="stat-card">
@@ -497,10 +614,7 @@
     empty.classList.add('hidden');
     tbody.innerHTML = users.map(u => `
       <tr>
-        <td>
-          <span style="font-weight:600;color:#e6edf3">${esc(u.username)}</span>
-          ${u.isAdmin ? '<span class="badge-admin">ADMIN</span>' : ''}
-        </td>
+        <td><span style="font-weight:600;color:#e6edf3">${esc(u.username)}</span></td>
         <td>${esc(u.email || '—')}</td>
         <td><span class="date-text">${fmtDate(u.createdAt)}</span></td>
         <td><span class="badge-count">${u.tradeCount}</span></td>
@@ -608,7 +722,6 @@
     filterUsers();
     closeModal('delModal');
 
-    // refresh stats
     const stats = await api('/api/admin/stats');
     if (stats.ok) renderStats(stats.data);
   }
@@ -624,15 +737,9 @@
     el.style.display = 'block';
   }
 
-  // Close modal on backdrop click
   document.querySelectorAll('.modal-backdrop').forEach(bd => {
     bd.addEventListener('click', e => { if (e.target === bd) bd.classList.remove('open'); });
   });
-
-  async function logout() {
-    await fetch('/api/logout', { method: 'POST' });
-    window.location.href = '/';
-  }
 
   init();
 </script>

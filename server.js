@@ -406,11 +406,7 @@ function requireAuth(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
-  const adminUser = (process.env.ADMIN_USERNAME || '').toLowerCase();
-  if (!adminUser) return res.status(403).json({ error: 'Admin not configured' });
-  if ((req.session.username || '').toLowerCase() !== adminUser)
-    return res.status(403).json({ error: 'Admin access required' });
+  if (!req.session.adminAuthed) return res.status(403).json({ error: 'Admin authentication required' });
   next();
 }
 
@@ -1027,6 +1023,29 @@ Guidelines:
 });
 
 // ── ADMIN ROUTES ──────────────────────────────────────────────────────────────
+
+app.post('/api/admin/login', async (req, res) => {
+  const { password } = req.body;
+  const adminPassword = process.env.ADMIN_PASSWORD || '';
+  if (!adminPassword) return res.status(503).json({ error: 'Admin not configured on this server' });
+  if (!password) return res.status(400).json({ error: 'Password required' });
+
+  const match = await bcrypt.compare(password, adminPassword).catch(() => false);
+  const plain = !match && password === adminPassword;
+  if (!match && !plain) return res.status(401).json({ error: 'Incorrect admin password' });
+
+  req.session.adminAuthed = true;
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  req.session.adminAuthed = false;
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/check', (req, res) => {
+  res.json({ authed: req.session.adminAuthed === true });
+});
 
 app.get('/api/admin/stats', requireAdmin, (req, res) => {
   const data = readData();
