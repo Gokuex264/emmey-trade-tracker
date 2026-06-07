@@ -372,6 +372,9 @@ function openTradeModal(id = null) {
   const form = document.getElementById('tradeForm');
   document.getElementById('modalTitle').textContent = id ? 'Edit Trade' : 'New Trade';
 
+  const portTarget = document.getElementById('editPortfolioTarget');
+  if (portTarget) portTarget.value = '';
+
   form.reset();
   document.querySelector('#tradeForm [name="date"]').value = new Date().toISOString().split('T')[0];
 
@@ -654,7 +657,7 @@ async function createNewNotebook() {
 
 async function createNewPage() {
   if (!activeNotebook) return;
-  await saveActiveNote(true);
+  saveActiveNote(true); // fire-and-forget — don't block page creation
   try {
     const res = await fetch(`/api/notebooks/${activeNotebook.id}/notes`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -894,17 +897,17 @@ function setupEventListeners() {
   // Refresh button
   document.getElementById('refreshTradingBtn')?.addEventListener('click', loadTradingData);
 
-  document.getElementById('openTradeModal').addEventListener('click', () => openTradeModal());
-  document.getElementById('tradeForm').addEventListener('submit', saveTrade);
+  document.getElementById('openTradeModal')?.addEventListener('click', () => openTradeModal());
+  document.getElementById('tradeForm')?.addEventListener('submit', saveTrade);
   document.querySelectorAll('.close-modal').forEach(b => {
-    b.addEventListener('click', () => document.getElementById('tradeModal').classList.add('hidden'));
+    b.addEventListener('click', () => document.getElementById('tradeModal')?.classList.add('hidden'));
   });
 
   document.getElementById('quickTradeForm')?.addEventListener('submit', quickAddTrade);
 
-  document.getElementById('tradeSearch').addEventListener('input', renderTradesTable);
-  document.getElementById('tradeStatusFilter').addEventListener('change', renderTradesTable);
-  document.getElementById('tradeDirFilter').addEventListener('change', renderTradesTable);
+  document.getElementById('tradeSearch')?.addEventListener('input', renderTradesTable);
+  document.getElementById('tradeStatusFilter')?.addEventListener('change', renderTradesTable);
+  document.getElementById('tradeDirFilter')?.addEventListener('change', renderTradesTable);
 
   document.getElementById('newNotebookBtn').addEventListener('click', createNewNotebook);
   document.getElementById('newPageBtn').addEventListener('click', createNewPage);
@@ -1029,6 +1032,7 @@ function renderMyTradeSymbols() {
 let savedArticles = [];
 let activeNewstab  = 'market';
 let newsTickerFilter = '';
+let newsListenersReady = false;
 
 async function initNewsTab() {
   await loadSavedArticles();
@@ -1038,11 +1042,13 @@ async function initNewsTab() {
 }
 
 function setupNewsListeners() {
+  if (newsListenersReady) return;
+  newsListenersReady = true;
   document.querySelectorAll('.news-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchNewstab(btn.dataset.newstab));
   });
-  document.getElementById('newsSearchBtn').addEventListener('click', searchTickerNews);
-  document.getElementById('newsTickerInput').addEventListener('keydown', e => {
+  document.getElementById('newsSearchBtn')?.addEventListener('click', searchTickerNews);
+  document.getElementById('newsTickerInput')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') searchTickerNews();
   });
 }
