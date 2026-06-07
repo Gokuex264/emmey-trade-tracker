@@ -405,6 +405,15 @@ function requireAuth(req, res, next) {
   next();
 }
 
+function requireAdmin(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
+  const adminUser = (process.env.ADMIN_USERNAME || '').toLowerCase();
+  if (!adminUser) return res.status(403).json({ error: 'Admin not configured' });
+  if ((req.session.username || '').toLowerCase() !== adminUser)
+    return res.status(403).json({ error: 'Admin access required' });
+  next();
+}
+
 // ── AUTH ROUTES ───────────────────────────────────────────────────────────────
 
 app.post('/api/register', async (req, res) => {
@@ -1015,6 +1024,111 @@ Guidelines:
     res.write('data: [DONE]\n\n');
     res.end();
   }
+});
+
+// ── ADMIN ROUTES ──────────────────────────────────────────────────────────────
+
+app.get('/api/admin/stats', requireAdmin, (req, res) => {
+  const data = readData();
+  const users = data.users || [];
+  const trades = data.trades || [];
+  const notebooks = data.notebooks || [];
+  const notes = data.notes || [];
+  const portfolios = data.portfolios || [];
+  const brokers = data.brokers || [];
+  const stats = users.map(u => ({
+    userId: u.id,
+    username: u.username,
+    trades: trades.filter(t => t.userId === u.id).length,
+    notebooks: notebooks.filter(n => n.userId === u.id).length,
+    notes: notes.filter(n => n.userId === u.id).length,
+    portfolios: portfolios.filter(p => p.userId === u.id).length,
+    brokers: brokers.filter(b => b.userId === u.id).length,
+  }));
+  res.json({
+    totalUsers: users.length,
+    totalTrades: trades.length,
+    totalNotebooks: notebooks.length,
+    totalNotes: notes.length,
+    totalPortfolios: portfolios.length,
+    totalBrokers: brokers.length,
+    perUser: stats
+  });
+});
+
+app.get('/api/admin/users', requireAdmin, (req, res) => {
+  const data = readData();
+  const trades = data.trades || [];
+  const notebooks = data.notebooks || [];
+  const portfolios = data.portfolios || [];
+  const brokers = data.brokers || [];
+  const users = (data.users || []).map(u => ({
+    id: u.id,
+    username: u.username,
+    email: u.email,
+    createdAt: u.createdAt,
+    isAdmin: u.isAdmin || false,
+    tradeCount: trades.filter(t => t.userId === u.id).length,
+    notebookCount: notebooks.filter(n => n.userId === u.id).length,
+    portfolioCount: portfolios.filter(p => p.userId === u.id).length,
+    brokerCount: brokers.filter(b => b.userId === u.id).length,
+  }));
+  res.json(users);
+});
+
+app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
+  const { username, email, newPassword, isAdmin } = req.body;
+  const data = readData();
+  const idx = (data.users || []).findIndex(u => u.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'User not found' });
+
+  if (username !== undefined) {
+    const taken = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.id !== req.params.id);
+    if (taken) return res.status(400).json({ error: 'Username already taken' });
+    data.users[idx].username = username;
+  }
+  if (email !== undefined) {
+    const taken = data.users.find(u => u.email === email.trim().toLowerCase() && u.id !== req.params.id);
+    if (taken) return res.status(400).json({ error: 'Email already in use' });
+    data.users[idx].email = email.trim().toLowerCase();
+  }
+  if (newPassword !== undefined) {
+    if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    data.users[idx].passwordHash = await bcrypt.hash(newPassword, 10);
+  }
+  if (isAdmin !== undefined) {
+    data.users[idx].isAdmin = Boolean(isAdmin);
+  }
+
+  writeData(data);
+  const u = data.users[idx];
+  res.json({ id: u.id, username: u.username, email: u.email, isAdmin: u.isAdmin || false });
+});
+
+app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
+  const data = readData();
+  const user = (data.users || []).find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const adminUser = (process.env.ADMIN_USERNAME || '').toLowerCase();
+  if (user.username.toLowerCase() === adminUser)
+    return res.status(400).json({ error: 'Cannot delete the admin account' });
+
+  const uid = req.params.id;
+  data.users        = data.users.filter(u => u.id !== uid);
+  data.trades       = (data.trades || []).filter(t => t.userId !== uid);
+  data.notebooks    = (data.notebooks || []).filter(n => n.userId !== uid);
+  data.notes        = (data.notes || []).filter(n => n.userId !== uid);
+  data.portfolios   = (data.portfolios || []).filter(p => p.userId !== uid);
+  data.brokers      = (data.brokers || []).filter(b => b.userId !== uid);
+  data.savedArticles= (data.savedArticles || []).filter(a => a.userId !== uid);
+  writeData(data);
+  res.json({ success: true });
+});
+
+// Serve admin page (only navigable if you know it exists — real auth is API-side)
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // Start server immediately so Render health checks pass

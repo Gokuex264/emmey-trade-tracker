@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TradeTracker Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-logo { font-size: 22px; font-weight: 700; color: #238636; }
+    .header-badge {
+      background: #238636;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .admin-username { color: #8b949e; font-size: 0.85rem; }
+    .btn-logout {
+      background: none;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 5px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      transition: background 0.15s;
+    }
+    .btn-logout:hover { background: #21262d; }
+
+    /* ── LAYOUT ── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+    /* ── NOT ADMIN GATE ── */
+    #accessDenied {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70vh;
+      gap: 16px;
+      text-align: center;
+    }
+    #accessDenied h2 { color: #f85149; font-size: 1.5rem; }
+    #accessDenied p { color: #8b949e; max-width: 360px; }
+    #accessDenied a { color: #7eb8ff; text-decoration: none; }
+
+    /* ── STATS GRID ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .stat-card .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #238636;
+      line-height: 1;
+    }
+    .stat-card .stat-label {
+      font-size: 0.78rem;
+      color: #8b949e;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── SECTION ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title { font-size: 1.1rem; font-weight: 600; color: #e6edf3; }
+
+    /* ── SEARCH ── */
+    .search-bar {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      width: 220px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .search-bar:focus { border-color: #238636; }
+
+    /* ── TABLE ── */
+    .table-wrap {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: #21262d; }
+    th {
+      padding: 10px 16px;
+      text-align: left;
+      color: #8b949e;
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid #30363d;
+      white-space: nowrap;
+    }
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid #21262d;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #1c2128; }
+    .badge-count {
+      display: inline-block;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 1px 8px;
+      font-size: 0.75rem;
+      color: #8b949e;
+    }
+    .badge-admin {
+      display: inline-block;
+      background: #1a4228;
+      border: 1px solid #238636;
+      border-radius: 20px;
+      padding: 1px 8px;
+      font-size: 0.72rem;
+      color: #3fb950;
+      margin-left: 6px;
+    }
+    .date-text { color: #8b949e; font-size: 0.78rem; }
+
+    /* ── ACTION BUTTONS ── */
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: 0.8; }
+    .btn-edit { background: #1f3a5f; border-color: #1a56db; color: #7eb8ff; }
+    .btn-pwd  { background: #2c1a5f; border-color: #6e40c9; color: #b088f9; }
+    .btn-del  { background: #3d1a1a; border-color: #da3633; color: #f85149; }
+
+    /* ── MODAL ── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .modal h3 { font-size: 1.1rem; color: #e6edf3; margin-bottom: 20px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.8rem; color: #8b949e; margin-bottom: 5px; font-weight: 500; }
+    .form-input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      font-size: 0.87rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: #238636; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn-primary {
+      background: #238636;
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-cancel {
+      background: none;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .btn-cancel:hover { background: #21262d; }
+    .modal-error {
+      background: #3d1a1a;
+      border: 1px solid #da3633;
+      border-radius: 6px;
+      color: #f85149;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .modal-success {
+      background: #1a3d2b;
+      border: 1px solid #238636;
+      border-radius: 6px;
+      color: #3fb950;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    /* ── CONFIRM MODAL ── */
+    .confirm-text { color: #8b949e; font-size: 0.88rem; margin-bottom: 20px; line-height: 1.5; }
+    .confirm-text strong { color: #f85149; }
+    .btn-danger {
+      background: #da3633;
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-danger:hover { background: #f85149; }
+
+    /* ── EMPTY ── */
+    .empty { text-align: center; padding: 40px; color: #8b949e; font-size: 0.9rem; }
+
+    /* ── LOADING ── */
+    .loading { text-align: center; padding: 60px; color: #8b949e; }
+    .spinner {
+      display: inline-block;
+      width: 28px; height: 28px;
+      border: 3px solid #30363d;
+      border-top-color: #238636;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span class="header-logo">📈 TradeTracker</span>
+    <span class="header-badge">ADMIN</span>
+  </div>
+  <div class="header-right">
+    <span class="admin-username" id="adminName"></span>
+    <button class="btn-logout" onclick="logout()">Log Out</button>
+    <a href="/" style="color:#7eb8ff;font-size:0.82rem;text-decoration:none;">← App</a>
+  </div>
+</div>
+
+<!-- Access denied -->
+<div id="accessDenied" class="hidden">
+  <h2>403 — Admin Access Required</h2>
+  <p>You must be logged in as the admin account to view this page.</p>
+  <a href="/">← Back to TradeTracker</a>
+</div>
+
+<!-- Main content -->
+<div id="mainContent" class="container hidden">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Users table -->
+  <div class="section-header">
+    <span class="section-title">All Accounts</span>
+    <input class="search-bar" type="text" placeholder="Search username or email…" id="searchInput" oninput="filterUsers()"/>
+  </div>
+
+  <div id="usersLoading" class="loading">
+    <div class="spinner"></div>
+    <div>Loading accounts…</div>
+  </div>
+
+  <div class="table-wrap hidden" id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Joined</th>
+          <th>Trades</th>
+          <th>Portfolios</th>
+          <th>Notebooks</th>
+          <th>Brokers</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="usersBody"></tbody>
+    </table>
+    <div id="emptyState" class="empty hidden">No accounts match your search.</div>
+  </div>
+
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal">
+    <h3>Edit Account</h3>
+    <div class="modal-error" id="editError"></div>
+    <div class="modal-success" id="editSuccess"></div>
+    <div class="form-group">
+      <label>Username</label>
+      <input class="form-input" type="text" id="editUsername"/>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input class="form-input" type="email" id="editEmail"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-backdrop" id="pwdModal">
+  <div class="modal">
+    <h3>Reset Password</h3>
+    <div class="modal-error" id="pwdError"></div>
+    <div class="modal-success" id="pwdSuccess"></div>
+    <div class="form-group">
+      <label>New Password for <strong id="pwdTarget" style="color:#c9d1d9"></strong></label>
+      <input class="form-input" type="password" id="newPassword" placeholder="Min 6 characters" autocomplete="new-password"/>
+    </div>
+    <div class="form-group">
+      <label>Confirm Password</label>
+      <input class="form-input" type="password" id="confirmPassword" placeholder="Repeat new password" autocomplete="new-password"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('pwdModal')">Cancel</button>
+      <button class="btn-primary" onclick="savePassword()">Set Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-backdrop" id="delModal">
+  <div class="modal">
+    <h3>Delete Account</h3>
+    <p class="confirm-text">
+      Are you sure you want to delete <strong id="delTarget"></strong>?<br/>
+      This will permanently remove their account, trades, notebooks, portfolios, and all associated data. This cannot be undone.
+    </p>
+    <div class="modal-error" id="delError"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('delModal')">Cancel</button>
+      <button class="btn-danger" onclick="confirmDelete()">Delete Account</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allUsers = [];
+  let currentEditId = null;
+  let currentDelId = null;
+
+  async function api(path, opts = {}) {
+    const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data };
+  }
+
+  async function init() {
+    const me = await api('/api/me');
+    if (!me.ok || !me.data.loggedIn) {
+      document.getElementById('accessDenied').classList.remove('hidden');
+      return;
+    }
+
+    // Try to load stats — 403 means not admin
+    const stats = await api('/api/admin/stats');
+    if (!stats.ok) {
+      document.getElementById('accessDenied').classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('adminName').textContent = me.data.username;
+    document.getElementById('mainContent').classList.remove('hidden');
+    renderStats(stats.data);
+    loadUsers();
+  }
+
+  function renderStats(s) {
+    document.getElementById('statsGrid').innerHTML = [
+      { label: 'Total Users',      value: s.totalUsers },
+      { label: 'Total Trades',     value: s.totalTrades },
+      { label: 'Total Portfolios', value: s.totalPortfolios },
+      { label: 'Total Notebooks',  value: s.totalNotebooks },
+      { label: 'Total Notes',      value: s.totalNotes },
+      { label: 'Broker Connections', value: s.totalBrokers },
+    ].map(c => `
+      <div class="stat-card">
+        <div class="stat-value">${c.value}</div>
+        <div class="stat-label">${c.label}</div>
+      </div>
+    `).join('');
+  }
+
+  async function loadUsers() {
+    const r = await api('/api/admin/users');
+    if (!r.ok) return;
+    allUsers = r.data;
+    document.getElementById('usersLoading').classList.add('hidden');
+    document.getElementById('tableWrap').classList.remove('hidden');
+    renderUsers(allUsers);
+  }
+
+  function filterUsers() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const filtered = allUsers.filter(u =>
+      u.username.toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+    );
+    renderUsers(filtered);
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function renderUsers(users) {
+    const tbody = document.getElementById('usersBody');
+    const empty = document.getElementById('emptyState');
+    if (!users.length) {
+      tbody.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>
+          <span style="font-weight:600;color:#e6edf3">${esc(u.username)}</span>
+          ${u.isAdmin ? '<span class="badge-admin">ADMIN</span>' : ''}
+        </td>
+        <td>${esc(u.email || '—')}</td>
+        <td><span class="date-text">${fmtDate(u.createdAt)}</span></td>
+        <td><span class="badge-count">${u.tradeCount}</span></td>
+        <td><span class="badge-count">${u.portfolioCount}</span></td>
+        <td><span class="badge-count">${u.notebookCount}</span></td>
+        <td><span class="badge-count">${u.brokerCount}</span></td>
+        <td>
+          <div class="actions">
+            <button class="btn btn-edit" onclick="openEdit('${u.id}')">Edit</button>
+            <button class="btn btn-pwd"  onclick="openPwd('${u.id}', '${esc(u.username)}')">Reset Pwd</button>
+            <button class="btn btn-del"  onclick="openDel('${u.id}', '${esc(u.username)}')">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── EDIT MODAL ──
+  function openEdit(id) {
+    const u = allUsers.find(u => u.id === id);
+    if (!u) return;
+    currentEditId = id;
+    document.getElementById('editUsername').value = u.username;
+    document.getElementById('editEmail').value = u.email || '';
+    document.getElementById('editError').style.display = 'none';
+    document.getElementById('editSuccess').style.display = 'none';
+    document.getElementById('editModal').classList.add('open');
+  }
+
+  async function saveEdit() {
+    const username = document.getElementById('editUsername').value.trim();
+    const email    = document.getElementById('editEmail').value.trim();
+    const errEl    = document.getElementById('editError');
+    const okEl     = document.getElementById('editSuccess');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+
+    if (!username || !email) { showErr(errEl, 'Username and email are required'); return; }
+
+    const r = await api(`/api/admin/users/${currentEditId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ username, email })
+    });
+    if (!r.ok) { showErr(errEl, r.data.error || 'Save failed'); return; }
+
+    okEl.textContent = 'Saved!';
+    okEl.style.display = 'block';
+    const idx = allUsers.findIndex(u => u.id === currentEditId);
+    if (idx !== -1) { allUsers[idx].username = r.data.username; allUsers[idx].email = r.data.email; }
+    filterUsers();
+    setTimeout(() => closeModal('editModal'), 1200);
+  }
+
+  // ── PASSWORD MODAL ──
+  function openPwd(id, username) {
+    currentEditId = id;
+    document.getElementById('pwdTarget').textContent = username;
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('pwdError').style.display = 'none';
+    document.getElementById('pwdSuccess').style.display = 'none';
+    document.getElementById('pwdModal').classList.add('open');
+  }
+
+  async function savePassword() {
+    const pwd  = document.getElementById('newPassword').value;
+    const conf = document.getElementById('confirmPassword').value;
+    const errEl = document.getElementById('pwdError');
+    const okEl  = document.getElementById('pwdSuccess');
+    errEl.style.display = 'none';
+    okEl.style.display = 'none';
+
+    if (pwd.length < 6) { showErr(errEl, 'Password must be at least 6 characters'); return; }
+    if (pwd !== conf)   { showErr(errEl, 'Passwords do not match'); return; }
+
+    const r = await api(`/api/admin/users/${currentEditId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ newPassword: pwd })
+    });
+    if (!r.ok) { showErr(errEl, r.data.error || 'Failed to reset password'); return; }
+
+    okEl.textContent = 'Password updated!';
+    okEl.style.display = 'block';
+    setTimeout(() => closeModal('pwdModal'), 1200);
+  }
+
+  // ── DELETE MODAL ──
+  function openDel(id, username) {
+    currentDelId = id;
+    document.getElementById('delTarget').textContent = username;
+    document.getElementById('delError').style.display = 'none';
+    document.getElementById('delModal').classList.add('open');
+  }
+
+  async function confirmDelete() {
+    const errEl = document.getElementById('delError');
+    errEl.style.display = 'none';
+    const r = await api(`/api/admin/users/${currentDelId}`, { method: 'DELETE' });
+    if (!r.ok) { showErr(errEl, r.data.error || 'Delete failed'); return; }
+    allUsers = allUsers.filter(u => u.id !== currentDelId);
+    filterUsers();
+    closeModal('delModal');
+
+    // refresh stats
+    const stats = await api('/api/admin/stats');
+    if (stats.ok) renderStats(stats.data);
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    currentEditId = null;
+    currentDelId  = null;
+  }
+
+  function showErr(el, msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  // Close modal on backdrop click
+  document.querySelectorAll('.modal-backdrop').forEach(bd => {
+    bd.addEventListener('click', e => { if (e.target === bd) bd.classList.remove('open'); });
+  });
+
+  async function logout() {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/';
+  }
+
+  init();
+</script>
+</body>
+</html>
