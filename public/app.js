@@ -397,6 +397,7 @@ async function saveTrade(e) {
   const data = Object.fromEntries(new FormData(form).entries());
 
   if (!data.exitPrice) delete data.exitPrice;
+  if (!data.quantity)  delete data.quantity;
   if (!data.pnl) delete data.pnl;
   if (!data.reason) delete data.reason;
   if (!data.notes) delete data.notes;
@@ -468,6 +469,7 @@ async function executeDelete() {
       trades = trades.filter(t => t.id !== pendingDeleteId);
       updateDashboard();
       renderTradesTable();
+      if (activePortfolioId) renderPortfolioDetail(activePortfolioId);
     } else if (pendingDeleteType === 'notebook') {
       await fetch(`/api/notebooks/${pendingDeleteId}`, { method: 'DELETE' });
       notebooks = notebooks.filter(nb => nb.id !== pendingDeleteId);
@@ -2179,7 +2181,7 @@ function renderPortfolioTradesTable(portTrades) {
   const tbody = document.getElementById('portTradesBody');
   if (!tbody) return;
   if (!portTrades.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No trades in this portfolio yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No trades in this portfolio yet</td></tr>';
     return;
   }
   tbody.innerHTML = portTrades.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt)).map(t => {
@@ -2189,11 +2191,16 @@ function renderPortfolioTradesTable(portTrades) {
       <td><strong>${escHtml(t.symbol || '')}</strong></td>
       <td>${t.assetType || 'stock'}</td>
       <td><span class="badge badge-${t.direction === 'short' ? 'short' : 'long'}">${t.direction || 'long'}</span></td>
+      <td>${t.quantity || '—'}</td>
       <td>${t.entryPrice ? '$' + t.entryPrice : '—'}</td>
       <td>${t.exitPrice ? '$' + t.exitPrice : '—'}</td>
       <td class="${pnlClass}">${t.pnl ? (pnlVal >= 0 ? '+' : '') + '$' + Math.abs(pnlVal).toFixed(2) : '—'}</td>
       <td><span class="badge badge-${t.status === 'open' ? 'open' : 'closed'}">${t.status || 'open'}</span></td>
       <td>${t.date || '—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-edit" onclick="editTrade('${t.id}')">Edit</button>
+        <button class="btn-del" onclick="confirmDelete('${t.id}', 'trade')">Del</button>
+      </td>
     </tr>`;
   }).join('');
 }
