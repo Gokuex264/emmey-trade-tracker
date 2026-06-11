@@ -948,26 +948,43 @@ app.post('/api/chat', requireAuth, async (req, res) => {
       ).join('\n')
     : '\n\nNo trades recorded yet.';
 
-  const systemPrompt = `You are an expert trading analyst, market strategist, and financial news interpreter. You serve as the user's personal AI analyst inside their trade tracker app.
+  const systemPrompt = `You are an expert trading analyst and personal AI analyst inside a trade tracker app.
 
-You can help with:
-1. TRADE ANALYSIS — analyze the user's actual trades, calculate P&L, win rate, patterns, and give personalized coaching
-2. MARKET NEWS & EVENTS — explain market-moving news, earnings reports, Fed decisions, CPI/jobs data, geopolitical events and their market impact
-3. ECONOMIC CONCEPTS — explain macroeconomics: inflation, interest rates, yield curves, GDP, monetary policy, sector rotation, etc.
-4. STOCK/ASSET RESEARCH — discuss fundamentals, technicals, sector trends, and trading setups for any symbol
-5. STRATEGY & EDUCATION — explain trading strategies, risk management, options, futures, crypto concepts
-6. CHARTS & VISUALIZATIONS — use the generate_chart tool to show visual data whenever it would be helpful
+═══════════════════════════════════════════════════
+CHART TOOL — MANDATORY USAGE RULES
+═══════════════════════════════════════════════════
+You have the generate_chart tool. You MUST call it in these situations — no exceptions:
+
+1. User says ANY of: "chart", "graph", "plot", "visualize", "show me", "create a chart", "make a chart", "draw" — CALL generate_chart immediately
+2. You are analyzing trade performance, P&L, win rates, returns, drawdowns → CALL generate_chart
+3. You are comparing symbols, strategies, time periods, asset types → CALL generate_chart (bar chart)
+4. You are showing distributions (win/loss ratio, asset mix) → CALL generate_chart (donut/pie)
+5. You are showing trends over time → CALL generate_chart (line chart)
+6. You are showing key stats/metrics → CALL generate_chart (stats type)
+
+Chart type guide:
+- "stats" → key metric number cards (total P&L, win rate, trade count, etc.)
+- "bar"   → comparisons between symbols, strategies, asset types
+- "line"  → cumulative P&L over time, equity curve
+- "pie"   → win/loss count ratio
+- "donut" → asset type distribution, trade status split
+
+CRITICAL: When a user asks for a chart, call the tool FIRST before writing any text. You may call generate_chart multiple times in one response. NEVER just list numbers in text when the user asked for a chart.
+═══════════════════════════════════════════════════
+
+You can also help with:
+- MARKET NEWS — explain market-moving events and their impact
+- ECONOMIC CONCEPTS — inflation, rates, yield curves, monetary policy
+- STOCK RESEARCH — fundamentals, technicals, sector trends
+- STRATEGY & EDUCATION — trading strategies, risk management, options, futures
 
 User's trade data:${tradeContext}
 
-Guidelines:
-- When analyzing trades, reference specific symbols and dates from the data above
-- When showing trade performance, P&L breakdowns, win rates, or comparisons — use generate_chart to visualize it
-- Use "stats" chart type for key summary numbers, "bar" for comparisons, "line" for trends over time, "pie"/"donut" for distributions
-- For news/economic questions, give clear context on WHY it matters to markets and HOW it typically affects prices
-- Always clarify if information may be outdated (your training data has a cutoff)
-- Be direct, specific, and actionable — avoid generic advice
-- Format responses with headers and bullets when covering multiple points`;
+Additional guidelines:
+- Reference specific symbols and dates from the trade data
+- For news/economic questions, explain WHY it matters to markets
+- Be direct, specific, actionable
+- Clarify when information may be outdated (knowledge cutoff applies)`;
 
   const chartTool = {
     name: 'generate_chart',
@@ -1047,36 +1064,67 @@ Guidelines:
     let toolInput = '';
     let inToolUse = false;
     let toolName = '';
+    let lineBuffer = '';
 
     for await (const chunk of anthropicRes.body) {
-      const text = decoder.decode(chunk);
-      for (const line of text.split('\n')) {
+      lineBuffer += decoder.decode(chunk, { stream: true });
+      const lines = lineBuffer.split('\n');
+      // keep last incomplete line in buffer
+      lineBuffer = lines.pop() || '';
+
+      for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const raw = line.slice(6).trim();
         if (!raw || raw === '[DONE]') continue;
         try {
           const parsed = JSON.parse(raw);
 
-          if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
-            inToolUse = true;
-            toolName = parsed.content_block.name;
-            toolInput = '';
+          if (parsed.type === 'content_block_start') {
+            if (parsed.content_block?.type === 'tool_use') {
+              inToolUse = true;
+              toolName = parsed.content_block.name;
+              toolInput = '';
+              console.log(`[CHART] Tool call started: ${toolName}`);
+            }
           } else if (parsed.type === 'content_block_delta') {
             if (parsed.delta?.type === 'text_delta') {
               res.write(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`);
             } else if (parsed.delta?.type === 'input_json_delta' && inToolUse) {
               toolInput += parsed.delta.partial_json || '';
             }
-          } else if (parsed.type === 'content_block_stop' && inToolUse) {
-            inToolUse = false;
-            if (toolName === 'generate_chart') {
-              try {
-                const chartData = JSON.parse(toolInput);
-                res.write(`data: ${JSON.stringify({ chart: chartData })}\n\n`);
-              } catch (_) {}
+          } else if (parsed.type === 'content_block_stop') {
+            if (inToolUse) {
+              inToolUse = false;
+              if (toolName === 'generate_chart') {
+                console.log(`[CHART] Tool input (${toolInput.length} chars):`, toolInput.slice(0, 300));
+                try {
+                  const chartData = JSON.parse(toolInput);
+                  console.log(`[CHART] Emitting chart type: ${chartData.chart_type}`);
+                  res.write(`data: ${JSON.stringify({ chart: chartData })}\n\n`);
+                } catch (parseErr) {
+                  console.error('[CHART] JSON parse failed:', parseErr.message, '| Raw:', toolInput.slice(0, 200));
+                }
+              }
+              toolInput = '';
+              toolName = '';
             }
-            toolInput = '';
-            toolName = '';
+          } else if (parsed.type === 'message_delta') {
+            console.log(`[CHAT] Stop reason: ${parsed.delta?.stop_reason}`);
+          }
+        } catch (_) {}
+      }
+    }
+    // flush any remaining buffer
+    if (lineBuffer.startsWith('data: ')) {
+      const raw = lineBuffer.slice(6).trim();
+      if (raw && raw !== '[DONE]') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.type === 'content_block_stop' && inToolUse && toolName === 'generate_chart') {
+            try {
+              const chartData = JSON.parse(toolInput);
+              res.write(`data: ${JSON.stringify({ chart: chartData })}\n\n`);
+            } catch (_) {}
           }
         } catch (_) {}
       }
@@ -1198,9 +1246,7 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
   const user = (data.users || []).find(u => u.id === req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const adminUser = (process.env.ADMIN_USERNAME || '').toLowerCase();
-  if (user.username.toLowerCase() === adminUser)
-    return res.status(400).json({ error: 'Cannot delete the admin account' });
+  // prevent deleting the built-in admin session (no specific username tied to it)
 
   const uid = req.params.id;
   data.users        = data.users.filter(u => u.id !== uid);
