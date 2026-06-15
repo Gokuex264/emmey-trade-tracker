@@ -594,6 +594,11 @@ function loadPageIntoEditor(note) {
   const body = document.getElementById('pageBody');
   body.innerHTML = note.body || '';
 
+  // Re-fetch text file previews in case they saved before the fetch completed
+  body.querySelectorAll('.text-file-preview[data-url]').forEach(el => {
+    loadTextPreview(el, el.getAttribute('data-url'));
+  });
+
   // Scroll editor to top
   body.scrollTop = 0;
 
@@ -791,12 +796,29 @@ function fmtFileSize(bytes) {
   return bytes + ' B';
 }
 
+function loadTextPreview(el, url) {
+  if (!el || !url) return;
+  fetch(url).then(r => {
+    if (!r.ok) throw new Error('not found');
+    return r.text();
+  }).then(text => {
+    el.textContent = text;
+  }).catch(() => {
+    el.textContent = '(File preview unavailable — file may have been removed from server)';
+  });
+}
+
 function toggleAttachment(btn) {
   const wrap = btn.closest('.note-attachment');
   if (!wrap) return;
   const collapsed = wrap.classList.toggle('collapsed');
   btn.textContent = collapsed ? '▶' : '▼';
   scheduleNoteSave();
+}
+
+function isOfficeDoc(mime, name) {
+  return /\.(docx?|xlsx?|pptx?)$/i.test(name) ||
+    mime.includes('msword') || mime.includes('openxmlformats') || mime.includes('vnd.ms-');
 }
 
 function insertAttachment(url, name, mime, size) {
@@ -806,6 +828,7 @@ function insertAttachment(url, name, mime, size) {
   const icon = getFileIcon(mime, name);
   const sizeFmt = fmtFileSize(size || 0);
   const safeName = escHtml(name || 'file');
+  const absUrl = window.location.origin + url;
 
   const wrap = document.createElement('div');
   wrap.contentEditable = 'false';
@@ -825,7 +848,27 @@ function insertAttachment(url, name, mime, size) {
           <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
         </div>
       </div>
-      <iframe src="${url}" class="pdf-viewer" title="${safeName}"></iframe>`;
+      <object data="${url}" type="application/pdf" class="pdf-viewer" data-src="${url}">
+        <div class="pdf-fallback">
+          PDF preview not supported by your browser.<br>
+          <a href="${url}" target="_blank" class="attach-btn" style="margin-top:8px;display:inline-block">Open PDF ↗</a>
+        </div>
+      </object>`;
+  } else if (isOfficeDoc(mime, name)) {
+    const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(absUrl)}`;
+    wrap.className = 'note-attachment note-office';
+    wrap.innerHTML = `
+      <div class="attach-header">
+        ${toggleBtn}
+        <span class="attach-icon">${icon}</span>
+        <span class="attach-name">${safeName}</span>
+        <span class="attach-size">${sizeFmt}</span>
+        <div class="attach-actions">
+          <a href="${url}" target="_blank" class="attach-btn">Open</a>
+          <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+        </div>
+      </div>
+      <iframe src="${viewerUrl}" class="pdf-viewer office-viewer" data-office-src="${viewerUrl}" title="${safeName}" allowfullscreen></iframe>`;
   } else if (mime.startsWith('text/') || /\.(txt|md|json)$/i.test(name)) {
     wrap.className = 'note-attachment note-text-file';
     wrap.innerHTML = `
@@ -840,13 +883,7 @@ function insertAttachment(url, name, mime, size) {
         </div>
       </div>
       <div class="text-file-preview" data-url="${url}">Loading…</div>`;
-    fetch(url).then(r => r.text()).then(text => {
-      const preview = wrap.querySelector('.text-file-preview');
-      if (preview) preview.textContent = text;
-    }).catch(() => {
-      const preview = wrap.querySelector('.text-file-preview');
-      if (preview) preview.textContent = '(Preview unavailable)';
-    });
+    loadTextPreview(wrap.querySelector('.text-file-preview'), url);
   } else {
     wrap.className = 'note-attachment';
     wrap.innerHTML = `
@@ -856,6 +893,7 @@ function insertAttachment(url, name, mime, size) {
         <span class="attach-name">${safeName}</span>
         <span class="attach-size">${sizeFmt}</span>
         <div class="attach-actions">
+          <a href="${url}" target="_blank" class="attach-btn">Open ↗</a>
           <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
         </div>
       </div>`;

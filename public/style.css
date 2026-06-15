@@ -1892,7 +1892,7 @@ label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: 
 .note-attachment.collapsed .pdf-viewer,
 .note-attachment.collapsed .text-file-preview { display: none; }
 
-/* PDF inline viewer — tall so the full document is scrollable */
+/* PDF / Office inline viewer — tall so the full document is scrollable */
 .pdf-viewer {
   display: block;
   width: 100%;
@@ -1901,6 +1901,13 @@ label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: 
   border: none;
   border-top: 1px solid #30363d;
   background: #fff;
+}
+.pdf-fallback {
+  padding: 32px 20px;
+  text-align: center;
+  color: #8b949e;
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 /* Text file preview — full content, scrollable */
