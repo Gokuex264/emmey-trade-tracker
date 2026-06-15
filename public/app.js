@@ -15,6 +15,7 @@ let activeNote = null;
 let editingTradeId = null;
 let pendingDeleteId = null;
 let pendingDeleteType = null;
+let pendingConfirmAction = null; // general-purpose confirm callback
 let chatHistory = [];
 let currentUser = null;
 let brokers = [];
@@ -454,9 +455,17 @@ async function quickAddTrade(e) {
 }
 
 // ── DELETE CONFIRM ────────────────────────────────────────────────────────────
+function showConfirm(message, onOk) {
+  pendingConfirmAction = onOk;
+  pendingDeleteId = null;
+  document.getElementById('confirmMsg').textContent = message;
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
 function confirmDelete(id, type) {
   pendingDeleteId = id;
   pendingDeleteType = type;
+  pendingConfirmAction = null;
   document.getElementById('confirmMsg').textContent = `Delete this ${type}?`;
   document.getElementById('confirmModal').classList.remove('hidden');
 }
@@ -496,7 +505,6 @@ async function executeDelete() {
       renderPagesList();
     }
   } catch (err) { alert('Error deleting: ' + err.message); }
-  document.getElementById('confirmModal').classList.add('hidden');
   pendingDeleteId = null;
 }
 
@@ -1365,10 +1373,20 @@ function setupEventListeners() {
     input.type = input.type === 'password' ? 'text' : 'password';
   });
 
-  document.getElementById('confirmOk').addEventListener('click', executeDelete);
+  document.getElementById('confirmOk').addEventListener('click', async () => {
+    document.getElementById('confirmModal').classList.add('hidden');
+    if (pendingConfirmAction) {
+      const action = pendingConfirmAction;
+      pendingConfirmAction = null;
+      await action();
+    } else {
+      await executeDelete();
+    }
+  });
   document.getElementById('confirmCancel').addEventListener('click', () => {
     document.getElementById('confirmModal').classList.add('hidden');
     pendingDeleteId = null;
+    pendingConfirmAction = null;
   });
 
   document.querySelectorAll('.modal').forEach(modal => {
@@ -1904,12 +1922,13 @@ function filterOrders() {
 }
 
 async function cancelOrder(orderId) {
-  if (!confirm('Cancel this order?')) return;
-  try {
-    const res = await post('/api/trading/cancel-order', { connectionId: activeTradingConnId, orderId });
-    if (res.ok) { await loadTradingData(); }
-    else { const d = await res.json(); alert('Cancel failed: ' + d.error); }
-  } catch (e) { alert('Error: ' + e.message); }
+  showConfirm('Cancel this order?', async () => {
+    try {
+      const res = await post('/api/trading/cancel-order', { connectionId: activeTradingConnId, orderId });
+      if (res.ok) { await loadTradingData(); }
+      else { const d = await res.json(); alert('Cancel failed: ' + d.error); }
+    } catch (e) { alert('Error: ' + e.message); }
+  });
 }
 
 // ── Place Trade ───────────────────────────────────────────────────────────────
@@ -2151,10 +2170,13 @@ async function saveAlpacaConnection() {
 }
 
 async function disconnectBroker(id) {
-  if (!confirm('Disconnect this account? Your imported trades will stay in the tracker.')) return;
-  await fetch(`/api/brokers/${id}`, { method: 'DELETE' });
-  brokers = brokers.filter(b => b.id !== id);
-  renderAlpacaConnections();
+  showConfirm('Disconnect this account? Your imported trades will stay in the tracker.', async () => {
+    try {
+      await fetch(`/api/brokers/${id}`, { method: 'DELETE' });
+      brokers = brokers.filter(b => b.id !== id);
+      renderAlpacaConnections();
+    } catch (e) { alert('Error: ' + e.message); }
+  });
 }
 
 // ── Fetch from Alpaca ─────────────────────────────────────────────────────────
@@ -2646,11 +2668,14 @@ async function savePortfolio() {
 }
 
 async function deletePortfolio(portfolioId) {
-  if (!confirm('Delete this portfolio? The trades inside will not be deleted.')) return;
-  await fetch(`/api/portfolios/${portfolioId}`, { method: 'DELETE' });
-  if (activePortfolioId === portfolioId) closePortfolioDetail();
-  await loadPortfolios();
-  renderPortfoliosGrid();
+  showConfirm('Delete this portfolio? The trades inside will not be deleted.', async () => {
+    try {
+      await fetch(`/api/portfolios/${portfolioId}`, { method: 'DELETE' });
+      if (activePortfolioId === portfolioId) closePortfolioDetail();
+      await loadPortfolios();
+      renderPortfoliosGrid();
+    } catch (e) { alert('Error deleting portfolio: ' + e.message); }
+  });
 }
 
 function openAddTradeToPortfolio() {
