@@ -481,12 +481,18 @@ async function executeDelete() {
       backToNotebooks();
       renderNotebooksGrid();
     } else {
-      await fetch(`/api/notes/${pendingDeleteId}`, { method: 'DELETE' });
-      notes = notes.filter(n => n.id !== pendingDeleteId);
-      if (activeNote?.id === pendingDeleteId) {
+      const deletedId = pendingDeleteId;
+      const wasActive = activeNote?.id === deletedId;
+      await fetch(`/api/notes/${deletedId}`, { method: 'DELETE' });
+      // Cancel any in-flight autosave for the deleted note so it can't resurrect it
+      clearTimeout(saveNoteTimeout);
+      isSaving = false;
+      if (wasActive) {
         activeNote = null;
         showEditorEmpty();
       }
+      // Reload from server to guarantee correct list (eliminates race with autosave)
+      if (activeNotebook) await loadNotesForNotebook(activeNotebook.id);
       renderPagesList();
     }
   } catch (err) { alert('Error deleting: ' + err.message); }
@@ -612,6 +618,7 @@ async function saveActiveNote(immediate = false) {
   if (!activeNote || isSaving) return;
   clearTimeout(saveNoteTimeout);
 
+  const noteId = activeNote.id;
   const titleEl = document.getElementById('pageTitle');
   const tagsEl = document.getElementById('pageTags');
   const bodyEl = document.getElementById('pageBody');
@@ -623,15 +630,19 @@ async function saveActiveNote(immediate = false) {
 
   isSaving = true;
   try {
-    const res = await fetch(`/api/notes/${activeNote.id}`, {
+    const res = await fetch(`/api/notes/${noteId}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, body, tags })
     });
+    if (!res.ok) throw new Error(`Save returned ${res.status}`);
     const updated = await res.json();
-    const idx = notes.findIndex(n => n.id === activeNote.id);
-    if (idx !== -1) notes[idx] = updated;
-    activeNote = updated;
-    renderPagesList();
+    // Only update local state if this note still exists in the list (wasn't deleted during save)
+    const idx = notes.findIndex(n => n.id === noteId);
+    if (idx !== -1) {
+      notes[idx] = updated;
+      if (activeNote?.id === noteId) activeNote = updated;
+      renderPagesList();
+    }
     setAutosaveStatus('Saved');
     setTimeout(() => setAutosaveStatus(''), 2000);
   } catch (err) {
