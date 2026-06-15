@@ -791,6 +791,14 @@ function fmtFileSize(bytes) {
   return bytes + ' B';
 }
 
+function toggleAttachment(btn) {
+  const wrap = btn.closest('.note-attachment');
+  if (!wrap) return;
+  const collapsed = wrap.classList.toggle('collapsed');
+  btn.textContent = collapsed ? '▶' : '▼';
+  scheduleNoteSave();
+}
+
 function insertAttachment(url, name, mime, size) {
   const body = document.getElementById('pageBody');
   if (!body) return;
@@ -802,10 +810,13 @@ function insertAttachment(url, name, mime, size) {
   const wrap = document.createElement('div');
   wrap.contentEditable = 'false';
 
+  const toggleBtn = `<button class="attach-toggle" onclick="toggleAttachment(this)" title="Collapse / Expand">▼</button>`;
+
   if (mime === 'application/pdf') {
     wrap.className = 'note-attachment note-pdf';
     wrap.innerHTML = `
       <div class="attach-header">
+        ${toggleBtn}
         <span class="attach-icon">${icon}</span>
         <span class="attach-name">${safeName}</span>
         <span class="attach-size">${sizeFmt}</span>
@@ -819,6 +830,7 @@ function insertAttachment(url, name, mime, size) {
     wrap.className = 'note-attachment note-text-file';
     wrap.innerHTML = `
       <div class="attach-header">
+        ${toggleBtn}
         <span class="attach-icon">${icon}</span>
         <span class="attach-name">${safeName}</span>
         <span class="attach-size">${sizeFmt}</span>
@@ -827,11 +839,10 @@ function insertAttachment(url, name, mime, size) {
           <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
         </div>
       </div>
-      <div class="text-file-preview" data-url="${url}">Loading preview…</div>`;
-    // Fetch preview content
+      <div class="text-file-preview" data-url="${url}">Loading…</div>`;
     fetch(url).then(r => r.text()).then(text => {
       const preview = wrap.querySelector('.text-file-preview');
-      if (preview) preview.textContent = text.slice(0, 3000) + (text.length > 3000 ? '\n…(truncated)' : '');
+      if (preview) preview.textContent = text;
     }).catch(() => {
       const preview = wrap.querySelector('.text-file-preview');
       if (preview) preview.textContent = '(Preview unavailable)';
@@ -840,6 +851,7 @@ function insertAttachment(url, name, mime, size) {
     wrap.className = 'note-attachment';
     wrap.innerHTML = `
       <div class="attach-header">
+        ${toggleBtn}
         <span class="attach-icon">${icon}</span>
         <span class="attach-name">${safeName}</span>
         <span class="attach-size">${sizeFmt}</span>
