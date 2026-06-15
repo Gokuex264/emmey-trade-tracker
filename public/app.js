@@ -733,6 +733,167 @@ function fmt(cmd) {
   scheduleNoteSave();
 }
 
+// ── FILE ATTACHMENTS ─────────────────────────────────────────────────────────
+
+function triggerFileAttach() {
+  document.getElementById('attachFileInput').click();
+}
+
+async function handleFileAttach(file) {
+  if (!file) return;
+
+  // Images go through the existing image route
+  if (file.type.startsWith('image/')) {
+    handleImageUpload(file);
+    return;
+  }
+
+  setAutosaveStatus('Uploading…');
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/upload/file', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Upload failed'); setAutosaveStatus(''); return; }
+    insertAttachment(data.url, data.originalName, data.mimeType, data.size);
+    setAutosaveStatus('');
+  } catch (err) {
+    alert('Upload error: ' + err.message);
+    setAutosaveStatus('');
+  }
+}
+
+function getFileIcon(mime, name) {
+  if (mime === 'application/pdf') return '📄';
+  if (mime.includes('word') || /\.docx?$/i.test(name)) return '📝';
+  if (mime.includes('excel') || mime.includes('spreadsheet') || /\.xlsx?$/i.test(name)) return '📊';
+  if (mime.includes('powerpoint') || mime.includes('presentation') || /\.pptx?$/i.test(name)) return '📑';
+  if (mime.startsWith('text/') || /\.(txt|md|csv)$/i.test(name)) return '📃';
+  if (mime.includes('zip')) return '🗜️';
+  if (mime === 'application/json') return '{ }';
+  return '📁';
+}
+
+function fmtFileSize(bytes) {
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+  if (bytes >= 1024) return Math.round(bytes / 1024) + ' KB';
+  return bytes + ' B';
+}
+
+function insertAttachment(url, name, mime, size) {
+  const body = document.getElementById('pageBody');
+  if (!body) return;
+
+  const icon = getFileIcon(mime, name);
+  const sizeFmt = fmtFileSize(size || 0);
+  const safeName = escHtml(name || 'file');
+
+  const wrap = document.createElement('div');
+  wrap.contentEditable = 'false';
+
+  if (mime === 'application/pdf') {
+    wrap.className = 'note-attachment note-pdf';
+    wrap.innerHTML = `
+      <div class="attach-header">
+        <span class="attach-icon">${icon}</span>
+        <span class="attach-name">${safeName}</span>
+        <span class="attach-size">${sizeFmt}</span>
+        <div class="attach-actions">
+          <a href="${url}" target="_blank" class="attach-btn">Open</a>
+          <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+        </div>
+      </div>
+      <iframe src="${url}" class="pdf-viewer" title="${safeName}"></iframe>`;
+  } else if (mime.startsWith('text/') || /\.(txt|md|json)$/i.test(name)) {
+    wrap.className = 'note-attachment note-text-file';
+    wrap.innerHTML = `
+      <div class="attach-header">
+        <span class="attach-icon">${icon}</span>
+        <span class="attach-name">${safeName}</span>
+        <span class="attach-size">${sizeFmt}</span>
+        <div class="attach-actions">
+          <a href="${url}" target="_blank" class="attach-btn">View</a>
+          <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+        </div>
+      </div>
+      <div class="text-file-preview" data-url="${url}">Loading preview…</div>`;
+    // Fetch preview content
+    fetch(url).then(r => r.text()).then(text => {
+      const preview = wrap.querySelector('.text-file-preview');
+      if (preview) preview.textContent = text.slice(0, 3000) + (text.length > 3000 ? '\n…(truncated)' : '');
+    }).catch(() => {
+      const preview = wrap.querySelector('.text-file-preview');
+      if (preview) preview.textContent = '(Preview unavailable)';
+    });
+  } else {
+    wrap.className = 'note-attachment';
+    wrap.innerHTML = `
+      <div class="attach-header">
+        <span class="attach-icon">${icon}</span>
+        <span class="attach-name">${safeName}</span>
+        <span class="attach-size">${sizeFmt}</span>
+        <div class="attach-actions">
+          <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+        </div>
+      </div>`;
+  }
+
+  // Insert at cursor or append
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && body.contains(sel.anchorNode)) {
+    const range = sel.getRangeAt(0);
+    range.collapse(false);
+    range.insertNode(wrap);
+    // Add a line break after so the user can keep typing
+    const br = document.createElement('p');
+    br.innerHTML = '<br>';
+    wrap.after(br);
+    const newRange = document.createRange();
+    newRange.setStart(br, 0);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  } else {
+    body.appendChild(wrap);
+    const br = document.createElement('p');
+    br.innerHTML = '<br>';
+    body.appendChild(br);
+  }
+
+  scheduleNoteSave();
+}
+
+// Drag-and-drop files onto the page body
+function setupEditorDropZone() {
+  const wrap = document.getElementById('pageBodyWrap');
+  const overlay = document.getElementById('dropOverlay');
+  if (!wrap || !overlay) return;
+
+  let dragCounter = 0;
+
+  wrap.addEventListener('dragenter', e => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dragCounter++;
+    overlay.classList.remove('hidden');
+  });
+  wrap.addEventListener('dragleave', () => {
+    dragCounter--;
+    if (dragCounter <= 0) { dragCounter = 0; overlay.classList.add('hidden'); }
+  });
+  wrap.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+  });
+  wrap.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    overlay.classList.add('hidden');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileAttach(file);
+  });
+}
+
 // ── AI CHAT ──────────────────────────────────────────────────────────────────
 function checkApiKey() {
   // API key is now server-side; hide the notice for all users
@@ -1093,8 +1254,15 @@ function setupEventListeners() {
   });
   document.getElementById('imageFileInput').addEventListener('change', (e) => {
     handleImageUpload(e.target.files[0]);
-    e.target.value = ''; // reset so same file can be re-selected
+    e.target.value = '';
   });
+
+  document.getElementById('attachFileInput').addEventListener('change', (e) => {
+    handleFileAttach(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  setupEditorDropZone();
 
   // Editor input events (contenteditable)
   const pageBody = document.getElementById('pageBody');

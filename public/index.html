@@ -326,8 +326,10 @@
                   <button class="toolbar-btn" title="Undo" onclick="fmt('undo')">↩ Undo</button>
                   <button class="toolbar-btn" title="Redo" onclick="fmt('redo')">↪ Redo</button>
                   <div class="toolbar-sep"></div>
-                  <button class="toolbar-btn" title="Insert Photo" onclick="triggerImageUpload()">📷 Insert Photo</button>
+                  <button class="toolbar-btn" title="Insert Photo" onclick="triggerImageUpload()">📷 Photo</button>
                   <input type="file" id="imageFileInput" accept="image/*" style="display:none" />
+                  <button class="toolbar-btn" title="Attach File (PDF, Word, Text, etc.)" onclick="triggerFileAttach()">📎 Attach File</button>
+                  <input type="file" id="attachFileInput" accept=".pdf,.doc,.docx,.txt,.md,.csv,.xls,.xlsx,.ppt,.pptx,.zip,.json" style="display:none" />
                   <div class="toolbar-sep"></div>
                   <span style="color:var(--text2);font-size:12px;margin-right:4px">Tags:</span>
                   <input class="tags-input-inline" id="pageTags" placeholder="e.g. review, setup, lesson..." />
@@ -341,7 +343,10 @@
                 <input class="editor-title-input" id="pageTitle" placeholder="Page title..." />
 
                 <!-- Body (contenteditable) -->
-                <div class="page-body" id="pageBody" contenteditable="true" spellcheck="true"></div>
+                <div class="page-body-wrap" id="pageBodyWrap">
+                  <div class="page-body" id="pageBody" contenteditable="true" spellcheck="true"></div>
+                  <div class="drop-overlay hidden" id="dropOverlay">📎 Drop file to attach</div>
+                </div>
               </div>
             </div>
 

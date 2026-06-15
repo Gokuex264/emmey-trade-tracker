@@ -79,6 +79,22 @@ const upload = multer({
   }
 });
 
+// File upload multer — accepts docs, PDFs, text, images (used by notebook)
+const ALLOWED_MIME_PREFIXES = ['image/', 'text/', 'application/pdf', 'application/msword',
+  'application/vnd.openxmlformats', 'application/vnd.ms-', 'application/json',
+  'application/zip', 'application/x-zip'];
+const fileUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDir,
+    filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname).toLowerCase() || ''}`)
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_PREFIXES.some(p => file.mimetype.startsWith(p))) cb(null, true);
+    else cb(new Error('File type not supported'));
+  }
+});
+
 // CSV multer (memory storage, no disk write)
 const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -522,6 +538,16 @@ app.delete('/api/trades/:id', requireAuth, (req, res) => {
 app.post('/api/upload', requireAuth, upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   res.json({ url: `/uploads/${req.file.filename}` });
+});
+
+app.post('/api/upload/file', requireAuth, fileUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  res.json({
+    url: `/uploads/${req.file.filename}`,
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    size: req.file.size
+  });
 });
 
 // ─── NOTEBOOKS API ────────────────────────────────────────────────────────────
