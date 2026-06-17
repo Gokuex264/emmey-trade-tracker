@@ -288,10 +288,12 @@ function tickerLogo(symbol, size = 26) {
   const color  = avatarColor(sym);
   const fs     = Math.max(9, Math.floor(size * 0.38));
   const src    = logoSrc(sym);
+  // Avatar is always visible first. If the logo image loads with real content it swaps in.
+  // This way users always see something even when the logo service is unavailable.
   return `<span class="ticker-logo-wrap">` +
-    `<img class="ticker-logo" width="${size}" height="${size}" src="${src}" ` +
-    `onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'" alt="${sym}" />` +
-    `<span class="ticker-avatar" style="width:${size}px;height:${size}px;background:${color};font-size:${fs}px;display:none">${letter}</span>` +
+    `<span class="ticker-avatar" style="width:${size}px;height:${size}px;background:${color};font-size:${fs}px">${letter}</span>` +
+    `<img class="ticker-logo" width="${size}" height="${size}" src="${src}" alt="${sym}" style="display:none" ` +
+    `onload="if(this.naturalWidth>1){this.style.display='block';this.previousElementSibling.style.display='none'}" />` +
     `</span>`;
 }
 
@@ -2391,11 +2393,6 @@ function attachTickerPreview(inputEl, badgeEl) {
 function showTickerBadge(sym, badgeEl) {
   badgeEl.innerHTML = tickerLogo(sym, 22) + `<span>${sym}</span>`;
   badgeEl.classList.remove('hidden');
-  // swap in hidden avatar if img fails
-  const img = badgeEl.querySelector('img');
-  if (img) {
-    img.addEventListener('error', () => {}, { once: true });
-  }
 }
 
 function setupTickerPreviews() {
