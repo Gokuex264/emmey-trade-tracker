@@ -1259,6 +1259,17 @@ function setupEventListeners() {
     });
   });
 
+  // Portfolio chart timeframe buttons — static binding so they always work
+  document.querySelectorAll('.port-tf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!activePortfolioId) return;
+      portfolioChartTimeframe = btn.dataset.tf;
+      document.querySelectorAll('.port-tf-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      drawPortfolioChart(trades.filter(t => t.portfolioId === activePortfolioId), 'portChartWrap', portfolioChartTimeframe);
+    });
+  });
+
   // Mobile slide-in sidebar
   document.getElementById('mobHamburger')?.addEventListener('click', openMobSidebar);
   document.getElementById('mobSidebarClose')?.addEventListener('click', closeMobSidebar);
@@ -2503,14 +2514,9 @@ function openPortfolioDetail(portfolioId) {
 
   renderPortfolioDetail(portfolioId);
 
+  // Reset timeframe active state; clicks are handled by the static listener in setupEventListeners
   document.querySelectorAll('.port-tf-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tf === 'all');
-    btn.onclick = () => {
-      portfolioChartTimeframe = btn.dataset.tf;
-      document.querySelectorAll('.port-tf-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      drawPortfolioChart(trades.filter(t => t.portfolioId === portfolioId), 'portChartWrap', portfolioChartTimeframe);
-    };
   });
 }
 
