@@ -22,6 +22,16 @@ let brokers = [];
 let importParsedTrades = [];   // trades from CSV/API waiting for user selection
 let importSelectedBroker = '';
 
+// ── TOAST NOTIFICATIONS ──────────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  const bg = type === 'error' ? '#da3633' : type === 'success' ? '#3fb950' : '#444';
+  el.style.cssText = `position:fixed;top:20px;right:20px;z-index:9999;padding:12px 20px;border-radius:10px;color:#fff;font-size:14px;font-weight:500;max-width:320px;background:${bg};box-shadow:0 4px 20px rgba(0,0,0,0.4);pointer-events:none`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
 // ── API KEY ─────────────────────────────────────────────────────────────────
 function getApiKey() { return localStorage.getItem('claude_api_key') || ''; }
 function setApiKey(key) { localStorage.setItem('claude_api_key', key); }
@@ -503,17 +513,23 @@ function confirmDelete(id, type) {
 
 async function executeDelete() {
   if (!pendingDeleteId) return;
+  const id = pendingDeleteId;
+  const type = pendingDeleteType;
+  pendingDeleteId = null;
   try {
-    if (pendingDeleteType === 'trade') {
-      await fetch(`/api/trades/${pendingDeleteId}`, { method: 'DELETE' });
-      trades = trades.filter(t => t.id !== pendingDeleteId);
+    if (type === 'trade') {
+      const res = await fetch(`/api/trades/${id}`, { method: 'DELETE' });
+      if (!res.ok) { showToast(`Delete failed (${res.status})`, 'error'); return; }
+      trades = trades.filter(t => t.id !== id);
+      showToast('Trade deleted', 'success');
       updateDashboard();
       renderTradesTable();
       if (activePortfolioId) renderPortfolioDetail(activePortfolioId);
-    } else if (pendingDeleteType === 'notebook') {
-      await fetch(`/api/notebooks/${pendingDeleteId}`, { method: 'DELETE' });
-      notebooks = notebooks.filter(nb => nb.id !== pendingDeleteId);
-      if (activeNotebook?.id === pendingDeleteId) {
+    } else if (type === 'notebook') {
+      const res = await fetch(`/api/notebooks/${id}`, { method: 'DELETE' });
+      if (!res.ok) { showToast(`Delete failed (${res.status})`, 'error'); return; }
+      notebooks = notebooks.filter(nb => nb.id !== id);
+      if (activeNotebook?.id === id) {
         activeNotebook = null;
         notes = [];
         activeNote = null;
@@ -521,9 +537,9 @@ async function executeDelete() {
       backToNotebooks();
       renderNotebooksGrid();
     } else {
-      const deletedId = pendingDeleteId;
-      const wasActive = activeNote?.id === deletedId;
-      await fetch(`/api/notes/${deletedId}`, { method: 'DELETE' });
+      const wasActive = activeNote?.id === id;
+      const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+      if (!res.ok) { showToast(`Delete failed (${res.status})`, 'error'); return; }
       // Cancel any in-flight autosave for the deleted note so it can't resurrect it
       clearTimeout(saveNoteTimeout);
       isSaving = false;
@@ -535,8 +551,10 @@ async function executeDelete() {
       if (activeNotebook) await loadNotesForNotebook(activeNotebook.id);
       renderPagesList();
     }
-  } catch (err) { alert('Error deleting: ' + err.message); }
-  pendingDeleteId = null;
+  } catch (err) {
+    console.error('Delete error:', err);
+    showToast('Error: ' + err.message, 'error');
+  }
 }
 
 // ── NOTEBOOK ─────────────────────────────────────────────────────────────────
