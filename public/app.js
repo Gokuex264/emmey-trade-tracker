@@ -806,6 +806,50 @@ function fmt(cmd) {
   scheduleNoteSave();
 }
 
+// ── TEXT COLOR ───────────────────────────────────────────────────────────────
+
+let _savedColorRange = null;
+
+function toggleColorPicker(e) {
+  e.stopPropagation();
+  // Save the current selection so we can restore it after the user picks a color
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount) _savedColorRange = sel.getRangeAt(0).cloneRange();
+  const dd = document.getElementById('colorPickerDropdown');
+  dd.classList.toggle('hidden');
+}
+
+function applyTextColor(color) {
+  const body = document.getElementById('pageBody');
+  if (!body) return;
+  // Restore saved selection (clicking the swatch blurs the editor)
+  if (_savedColorRange) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_savedColorRange);
+    _savedColorRange = null;
+  }
+  body.focus();
+  if (color === null) {
+    document.execCommand('removeFormat', false, null);
+  } else {
+    document.execCommand('foreColor', false, color);
+    // Update the indicator bar color
+    document.getElementById('colorBtnBar').style.background = color;
+    document.getElementById('colorBtnA').style.color = color;
+  }
+  document.getElementById('colorPickerDropdown').classList.add('hidden');
+  scheduleNoteSave();
+}
+
+// Close color picker when clicking outside
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('colorPickerWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('colorPickerDropdown')?.classList.add('hidden');
+  }
+});
+
 // ── FILE ATTACHMENTS ─────────────────────────────────────────────────────────
 
 function triggerFileAttach() {
@@ -873,6 +917,13 @@ function toggleAttachment(btn) {
   scheduleNoteSave();
 }
 
+function removeAttachment(btn) {
+  const wrap = btn.closest('.note-attachment');
+  if (!wrap) return;
+  wrap.remove();
+  scheduleNoteSave();
+}
+
 function isOfficeDoc(mime, name) {
   return /\.(docx?|xlsx?|pptx?)$/i.test(name) ||
     mime.includes('msword') || mime.includes('openxmlformats') || mime.includes('vnd.ms-');
@@ -891,6 +942,7 @@ function insertAttachment(url, name, mime, size) {
   wrap.contentEditable = 'false';
 
   const toggleBtn = `<button class="attach-toggle" onclick="toggleAttachment(this)" title="Collapse / Expand">▼</button>`;
+  const removeBtn = `<button class="attach-btn attach-del-btn" onclick="removeAttachment(this)" title="Remove this file from page">✕ Remove</button>`;
 
   if (mime === 'application/pdf') {
     wrap.className = 'note-attachment note-pdf';
@@ -903,6 +955,7 @@ function insertAttachment(url, name, mime, size) {
         <div class="attach-actions">
           <a href="${url}" target="_blank" class="attach-btn">Open</a>
           <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+          ${removeBtn}
         </div>
       </div>
       <object data="${url}" type="application/pdf" class="pdf-viewer" data-src="${url}">
@@ -923,6 +976,7 @@ function insertAttachment(url, name, mime, size) {
         <div class="attach-actions">
           <a href="${url}" target="_blank" class="attach-btn">Open</a>
           <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+          ${removeBtn}
         </div>
       </div>
       <iframe src="${viewerUrl}" class="pdf-viewer office-viewer" data-office-src="${viewerUrl}" title="${safeName}" allowfullscreen></iframe>`;
@@ -937,6 +991,7 @@ function insertAttachment(url, name, mime, size) {
         <div class="attach-actions">
           <a href="${url}" target="_blank" class="attach-btn">View</a>
           <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+          ${removeBtn}
         </div>
       </div>
       <div class="text-file-preview" data-url="${url}">Loading…</div>`;
@@ -952,6 +1007,7 @@ function insertAttachment(url, name, mime, size) {
         <div class="attach-actions">
           <a href="${url}" target="_blank" class="attach-btn">Open ↗</a>
           <a href="${url}" download="${safeName}" class="attach-btn">⬇ Download</a>
+          ${removeBtn}
         </div>
       </div>`;
   }
