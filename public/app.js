@@ -272,6 +272,24 @@ function getPnL(trade) {
   return trade.pnl.toString().trim();
 }
 
+// Derive a numeric P&L for a trade — uses manual pnl field first,
+// then falls back to calculating from entry/exit price * quantity.
+function calcTradePnl(t) {
+  if (t.pnl) {
+    const n = parseFloat(t.pnl.toString().replace(/[^0-9.\-]/g, ''));
+    if (!isNaN(n)) return n;
+  }
+  if (t.entryPrice && t.exitPrice) {
+    const entry = parseFloat(t.entryPrice);
+    const exit  = parseFloat(t.exitPrice);
+    const qty   = parseFloat(t.quantity) || 1;
+    if (!isNaN(entry) && !isNaN(exit) && entry > 0) {
+      return (t.direction === 'short' ? entry - exit : exit - entry) * qty;
+    }
+  }
+  return null;
+}
+
 // ── TICKER LOGO HELPER ───────────────────────────────────────────────────────
 const LOGO_COLORS = ['#1f6feb','#238636','#da3633','#d29922','#8b5cf6','#0ea5e9','#f97316','#10b981','#ec4899','#14b8a6'];
 
@@ -401,9 +419,20 @@ async function saveTrade(e) {
 
   if (!data.exitPrice) delete data.exitPrice;
   if (!data.quantity)  delete data.quantity;
-  if (!data.pnl) delete data.pnl;
   if (!data.reason) delete data.reason;
   if (!data.notes) delete data.notes;
+
+  // Auto-calculate P&L when closing a trade if not manually entered
+  if (!data.pnl && data.status === 'closed' && data.entryPrice && data.exitPrice) {
+    const entry = parseFloat(data.entryPrice);
+    const exit  = parseFloat(data.exitPrice);
+    const qty   = parseFloat(data.quantity) || 1;
+    if (!isNaN(entry) && !isNaN(exit) && entry > 0) {
+      const pnlVal = (data.direction === 'short' ? entry - exit : exit - entry) * qty;
+      data.pnl = (pnlVal >= 0 ? '+' : '') + pnlVal.toFixed(2);
+    }
+  }
+  if (!data.pnl) delete data.pnl;
 
   const portTarget = document.getElementById('editPortfolioTarget')?.value;
   if (portTarget) data.portfolioId = portTarget;
@@ -2471,8 +2500,8 @@ function renderPortfoliosGrid() {
   grid.innerHTML = portfolios.map(p => {
     const portTrades = trades.filter(t => t.portfolioId === p.id);
     const closed = portTrades.filter(t => t.status === 'closed');
-    const totalPnl = closed.reduce((s, t) => s + (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0), 0);
-    const winners = closed.filter(t => (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0) > 0);
+    const totalPnl = closed.reduce((s, t) => s + (calcTradePnl(t) ?? 0), 0);
+    const winners = closed.filter(t => (calcTradePnl(t) ?? 0) > 0);
     const winRate = closed.length ? Math.round(winners.length / closed.length * 100) : 0;
     const isPos = totalPnl >= 0;
     return `
@@ -2521,8 +2550,8 @@ function renderPortfolioDetail(portfolioId) {
   const portTrades = trades.filter(t => t.portfolioId === portfolioId);
   const closed = portTrades.filter(t => t.status === 'closed');
   const open = portTrades.filter(t => t.status === 'open');
-  const totalPnl = closed.reduce((s, t) => s + (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0), 0);
-  const winners = closed.filter(t => (parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0) > 0);
+  const totalPnl = closed.reduce((s, t) => s + (calcTradePnl(t) ?? 0), 0);
+  const winners = closed.filter(t => (calcTradePnl(t) ?? 0) > 0);
   const winRate = closed.length ? Math.round(winners.length / closed.length * 100) : 0;
   const isPos = totalPnl >= 0;
 
@@ -2542,8 +2571,8 @@ function drawPortfolioChart(portTrades, containerId, timeframe) {
   if (!container) return;
 
   let points = portTrades
-    .filter(t => t.status === 'closed' && t.pnl && t.date)
-    .map(t => ({ date: new Date(t.date), pnl: parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0 }))
+    .filter(t => t.status === 'closed' && t.date && calcTradePnl(t) !== null)
+    .map(t => ({ date: new Date(t.date), pnl: calcTradePnl(t) }))
     .filter(t => !isNaN(t.date.getTime()))
     .sort((a, b) => a.date - b.date);
 
@@ -2613,8 +2642,9 @@ function renderPortfolioTradesTable(portTrades) {
     return;
   }
   tbody.innerHTML = portTrades.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt)).map(t => {
-    const pnlVal = parseFloat((t.pnl || '0').replace(/[^-\d.]/g, '')) || 0;
+    const pnlVal = calcTradePnl(t);
     const pnlClass = pnlVal > 0 ? 'pnl-pos' : pnlVal < 0 ? 'pnl-neg' : '';
+    const pnlDisplay = pnlVal !== null ? `${pnlVal >= 0 ? '+' : ''}$${Math.abs(pnlVal).toFixed(2)}` : '—';
     return `<tr>
       <td><strong>${escHtml(t.symbol || '')}</strong></td>
       <td>${t.assetType || 'stock'}</td>
@@ -2622,7 +2652,7 @@ function renderPortfolioTradesTable(portTrades) {
       <td>${t.quantity || '—'}</td>
       <td>${t.entryPrice ? '$' + t.entryPrice : '—'}</td>
       <td>${t.exitPrice ? '$' + t.exitPrice : '—'}</td>
-      <td class="${pnlClass}">${t.pnl ? (pnlVal >= 0 ? '+' : '') + '$' + Math.abs(pnlVal).toFixed(2) : '—'}</td>
+      <td class="${pnlClass}">${pnlDisplay}</td>
       <td><span class="badge badge-${t.status === 'open' ? 'open' : 'closed'}">${t.status || 'open'}</span></td>
       <td>${t.date || '—'}</td>
       <td style="white-space:nowrap">
