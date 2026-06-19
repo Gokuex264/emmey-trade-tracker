@@ -2621,6 +2621,7 @@ function openPortfolioDetail(portfolioId) {
 }
 
 function renderPortfolioDetail(portfolioId) {
+  if (!document.getElementById('portStatPnl')) return; // detail panel not in DOM yet
   const portTrades = trades.filter(t => t.portfolioId === portfolioId);
   const closed = portTrades.filter(t => t.status === 'closed');
   const open = portTrades.filter(t => t.status === 'open');
@@ -2775,13 +2776,19 @@ async function savePortfolio() {
 }
 
 async function deletePortfolio(portfolioId) {
+  if (!portfolioId) { showToast('No portfolio selected', 'error'); return; }
   showConfirm('Delete this portfolio? The trades inside will not be deleted.', async () => {
     try {
-      await fetch(`/api/portfolios/${portfolioId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/portfolios/${portfolioId}`, { method: 'DELETE' });
+      if (!res.ok) { showToast(`Delete failed (${res.status})`, 'error'); return; }
       if (activePortfolioId === portfolioId) closePortfolioDetail();
       await loadPortfolios();
       renderPortfoliosGrid();
-    } catch (e) { alert('Error deleting portfolio: ' + e.message); }
+      showToast('Portfolio deleted', 'success');
+    } catch (e) {
+      console.error('Portfolio delete error:', e);
+      showToast('Error: ' + e.message, 'error');
+    }
   });
 }
 
