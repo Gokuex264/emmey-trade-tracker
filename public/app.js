@@ -1356,7 +1356,10 @@ function renderPieChart(c, isDonut) {
 }
 
 // ── EVENT LISTENERS ──────────────────────────────────────────────────────────
+let listenersReady = false;
 function setupEventListeners() {
+  if (listenersReady) return;
+  listenersReady = true;
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       showTab(btn.dataset.tab);
