@@ -5,6 +5,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
 const multer = require('multer');
 const { Pool } = require('pg');
 
@@ -391,12 +392,16 @@ function writeData(data) {
 
 app.use(express.json());
 
-app.use(session({
+const sessionConfig = {
   secret: process.env.emmey_trade_tracker || 'tradetracker-secret-2025',
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
-}));
+};
+if (pool) {
+  sessionConfig.store = new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: true });
+}
+app.use(session(sessionConfig));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────────────────────
