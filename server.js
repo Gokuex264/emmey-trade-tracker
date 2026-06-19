@@ -420,6 +420,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.get('/api/debug/trades', (req, res) => {
+  const data = readData();
+  res.json({
+    sessionUserId: req.session?.userId || null,
+    trades: data.trades.map(t => ({ id: t.id, symbol: t.symbol, userId: t.userId, portfolioId: t.portfolioId })),
+    users: data.users.map(u => ({ id: u.id, username: u.username }))
+  });
+});
+
 // ── AUTH MIDDLEWARE ────────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
