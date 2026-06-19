@@ -520,8 +520,12 @@ async function executeDelete() {
     if (type === 'trade') {
       const res = await fetch(`/api/trades/${id}`, { method: 'DELETE' });
       if (res.status === 401) { showToast('Session expired — please log in again', 'error'); setTimeout(() => location.reload(), 1500); return; }
-      if (!res.ok) { showToast(`Delete failed (${res.status})`, 'error'); return; }
-      trades = trades.filter(t => t.id !== id);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || `Delete failed (${res.status})`, 'error');
+        return;
+      }
+      await loadTrades();
       showToast('Trade deleted', 'success');
       updateDashboard();
       renderTradesTable();

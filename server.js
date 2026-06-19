@@ -533,7 +533,9 @@ app.put('/api/trades/:id', requireAuth, (req, res) => {
 
 app.delete('/api/trades/:id', requireAuth, (req, res) => {
   const data = readData();
+  const before = data.trades.length;
   data.trades = data.trades.filter(t => !(t.id === req.params.id && t.userId === req.session.userId));
+  if (data.trades.length === before) return res.status(404).json({ error: 'Trade not found' });
   writeData(data);
   res.json({ success: true });
 });
