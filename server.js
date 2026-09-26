@@ -48,6 +48,7 @@ async function connectDb() {
         appDataCache = result.rows[0].data;
         let changed = false;
         DB_KEYS.forEach(k => { if (!appDataCache[k]) { appDataCache[k] = []; changed = true; } });
+        (appDataCache.trades || []).forEach(t => { if (!t.id) { t.id = uuidv4(); changed = true; } });
         if (changed) await pool.query('UPDATE appdata SET data = $1, updated_at = NOW() WHERE id = 1', [JSON.stringify(appDataCache)]);
         console.log(`📦 Loaded: ${appDataCache.users.length} users, ${appDataCache.trades.length} trades, ${(appDataCache.portfolios||[]).length} portfolios`);
       } else {
@@ -420,15 +421,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/debug/trades', (req, res) => {
-  const data = readData();
-  res.json({
-    sessionUserId: req.session?.userId || null,
-    trades: data.trades.map(t => ({ id: t.id, symbol: t.symbol, userId: t.userId, portfolioId: t.portfolioId })),
-    users: data.users.map(u => ({ id: u.id, username: u.username }))
-  });
-});
-
 // ── AUTH MIDDLEWARE ────────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
@@ -525,7 +517,7 @@ app.get('/api/trades', requireAuth, (req, res) => {
 
 app.post('/api/trades', requireAuth, (req, res) => {
   const data = readData();
-  const trade = { id: uuidv4(), userId: req.session.userId, createdAt: new Date().toISOString(), ...req.body };
+  const trade = { ...req.body, id: uuidv4(), userId: req.session.userId, createdAt: new Date().toISOString() };
   data.trades.push(trade);
   writeData(data);
   res.json(trade);

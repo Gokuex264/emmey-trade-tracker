@@ -1,4 +1,4 @@
-const CACHE = 'tradetracker-v1';
+const CACHE = 'tradetracker-v2';
 const STATIC = ['/index.html', '/app.js', '/style.css', '/manifest.json'];
 
 self.addEventListener('install', e => {
