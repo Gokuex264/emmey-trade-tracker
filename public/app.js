@@ -142,20 +142,27 @@ function setupAuthListeners() {
       });
       const data = await res.json();
       if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
-      showApp(data);
+      // Show the recovery phrase once, then enter the app
+      if (data.recoveryPhrase) {
+        showRecoveryPhrase(data.recoveryPhrase, () => showApp(data));
+      } else {
+        showApp(data);
+      }
     } catch { errEl.textContent = 'Network error. Try again.'; errEl.classList.remove('hidden'); }
   });
 }
 
-// ── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+// ── FORGOT PASSWORD (recovery phrase) ────────────────────────────────────────
 function showForgotForm() {
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('registerForm').classList.add('hidden');
   document.getElementById('forgotForm').classList.remove('hidden');
-  document.getElementById('forgotStep1').classList.remove('hidden');
-  document.getElementById('forgotStep2').classList.add('hidden');
-  document.getElementById('forgotError').classList.add('hidden');
   document.getElementById('forgotEmail').value = '';
+  document.getElementById('forgotPhrase').value = '';
+  document.getElementById('newPassword').value = '';
+  document.getElementById('newPasswordConfirm').value = '';
+  document.getElementById('resetError').classList.add('hidden');
+  document.getElementById('resetSuccess').classList.add('hidden');
   document.getElementById('loginTabBtn').classList.remove('active');
   document.getElementById('registerTabBtn').classList.remove('active');
 }
@@ -167,50 +174,27 @@ function showLoginForm() {
   document.getElementById('registerTabBtn').classList.remove('active');
 }
 
-async function submitForgotEmail() {
-  const email  = document.getElementById('forgotEmail').value.trim().toLowerCase();
-  const errEl  = document.getElementById('forgotError');
-  errEl.classList.add('hidden');
-
-  if (!email) { errEl.textContent = 'Please enter your email address.'; errEl.classList.remove('hidden'); return; }
-
-  try {
-    const res  = await fetch('/api/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await res.json();
-    if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
-
-    document.getElementById('recoveredUsername').textContent = data.username;
-    document.getElementById('forgotStep1').classList.add('hidden');
-    document.getElementById('forgotStep2').classList.remove('hidden');
-    document.getElementById('newPassword').value = '';
-    document.getElementById('newPasswordConfirm').value = '';
-    document.getElementById('resetError').classList.add('hidden');
-    document.getElementById('resetSuccess').classList.add('hidden');
-  } catch { errEl.textContent = 'Network error. Try again.'; errEl.classList.remove('hidden'); }
-}
-
-async function submitResetPassword() {
-  const email    = document.getElementById('forgotEmail').value.trim().toLowerCase();
-  const newPw    = document.getElementById('newPassword').value;
-  const confirm  = document.getElementById('newPasswordConfirm').value;
-  const errEl    = document.getElementById('resetError');
-  const succEl   = document.getElementById('resetSuccess');
+async function submitPhraseReset() {
+  const email   = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  const phrase  = document.getElementById('forgotPhrase').value;
+  const newPw   = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('newPasswordConfirm').value;
+  const errEl   = document.getElementById('resetError');
+  const succEl  = document.getElementById('resetSuccess');
   errEl.classList.add('hidden');
   succEl.classList.add('hidden');
 
-  if (!newPw) { errEl.textContent = 'Please enter a new password.'; errEl.classList.remove('hidden'); return; }
+  if (!email)  { errEl.textContent = 'Please enter your email address.'; errEl.classList.remove('hidden'); return; }
+  if (!phrase.trim()) { errEl.textContent = 'Please enter your recovery phrase.'; errEl.classList.remove('hidden'); return; }
+  if (!newPw)  { errEl.textContent = 'Please enter a new password.'; errEl.classList.remove('hidden'); return; }
   if (newPw.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.classList.remove('hidden'); return; }
   if (newPw !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.classList.remove('hidden'); return; }
 
   try {
-    const res  = await fetch('/api/reset-password', {
+    const res  = await fetch('/api/reset-with-phrase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, newPassword: newPw })
+      body: JSON.stringify({ email, phrase, newPassword: newPw })
     });
     const data = await res.json();
     if (!res.ok) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
@@ -219,6 +203,44 @@ async function submitResetPassword() {
     succEl.classList.remove('hidden');
     setTimeout(() => showLoginForm(), 1800);
   } catch { errEl.textContent = 'Network error. Try again.'; errEl.classList.remove('hidden'); }
+}
+
+// ── RECOVERY PHRASE MODAL ────────────────────────────────────────────────────
+let _recoveryContinueCb = null;
+function showRecoveryPhrase(phrase, onContinue) {
+  window._recoveryPhraseText = phrase;
+  _recoveryContinueCb = onContinue || null;
+  const box = document.getElementById('recoveryPhraseBox');
+  box.innerHTML = phrase.split(' ').map((w, i) =>
+    `<span><span style="color:#7f8ba3">${i + 1}.</span> ${w}</span>`
+  ).join('');
+  document.getElementById('recoveryConfirmChk').checked = false;
+  document.getElementById('recoveryContinueBtn').disabled = true;
+  document.getElementById('recoveryModal').classList.remove('hidden');
+}
+
+function closeRecoveryModal() {
+  document.getElementById('recoveryModal').classList.add('hidden');
+  const cb = _recoveryContinueCb;
+  _recoveryContinueCb = null;
+  if (cb) cb();
+}
+
+function copyRecoveryPhrase() {
+  const text = window._recoveryPhraseText || '';
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('Recovery phrase copied', 'success'))
+    .catch(() => showToast('Could not copy — please write it down', 'error'));
+}
+
+async function regenerateRecoveryPhrase() {
+  if (!confirm('Generate a new recovery phrase? Any previous phrase will stop working.')) return;
+  try {
+    const res = await fetch('/api/recovery/phrase', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Could not generate phrase', 'error'); return; }
+    showRecoveryPhrase(data.phrase, null);
+  } catch { showToast('Network error. Try again.', 'error'); }
 }
 
 async function logout() {

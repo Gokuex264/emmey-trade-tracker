@@ -65,35 +65,28 @@
         <button type="submit" class="btn-primary full-width">Create Account</button>
       </form>
 
-      <!-- Forgot Password Form -->
+      <!-- Forgot Password Form (recovery-phrase based) -->
       <div id="forgotForm" class="auth-form hidden">
-        <!-- Step 1: enter email -->
-        <div id="forgotStep1">
-          <p style="font-size:0.85rem;color:#aab;margin-bottom:14px">Enter the email you registered with and we'll show your username and let you reset your password.</p>
-          <div class="form-group">
-            <label>Email Address</label>
-            <input type="email" id="forgotEmail" placeholder="you@example.com" autocomplete="email" />
-          </div>
-          <div id="forgotError" class="auth-error hidden"></div>
-          <button class="btn-primary full-width" onclick="submitForgotEmail()">Look Up Account</button>
+        <p style="font-size:0.85rem;color:#aab;margin-bottom:14px">Enter your email, the 12-word recovery phrase you saved when you signed up, and a new password.</p>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="forgotEmail" placeholder="you@example.com" autocomplete="email" />
         </div>
-        <!-- Step 2: reset password -->
-        <div id="forgotStep2" class="hidden">
-          <div id="forgotUsernameDisplay" style="background:#1e2535;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:0.9rem;color:#e0e6f0">
-            Your username: <strong id="recoveredUsername"></strong>
-          </div>
-          <div class="form-group">
-            <label>New Password</label>
-            <input type="password" id="newPassword" placeholder="Choose a new password (min 6 chars)" autocomplete="new-password" />
-          </div>
-          <div class="form-group">
-            <label>Confirm New Password</label>
-            <input type="password" id="newPasswordConfirm" placeholder="Repeat your new password" autocomplete="new-password" />
-          </div>
-          <div id="resetError" class="auth-error hidden"></div>
-          <div id="resetSuccess" class="hidden" style="color:#3ddc84;font-size:0.85rem;margin-bottom:12px;text-align:center"></div>
-          <button class="btn-primary full-width" onclick="submitResetPassword()">Reset Password</button>
+        <div class="form-group">
+          <label>Recovery Phrase (12 words)</label>
+          <textarea id="forgotPhrase" placeholder="e.g. apple river maple ..." rows="3" style="width:100%;resize:vertical;font-family:inherit"></textarea>
         </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="newPassword" placeholder="Choose a new password (min 6 chars)" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="newPasswordConfirm" placeholder="Repeat your new password" autocomplete="new-password" />
+        </div>
+        <div id="resetError" class="auth-error hidden"></div>
+        <div id="resetSuccess" class="hidden" style="color:#3ddc84;font-size:0.85rem;margin-bottom:12px;text-align:center"></div>
+        <button class="btn-primary full-width" onclick="submitPhraseReset()">Reset Password</button>
         <button class="btn-link" style="margin-top:14px;width:100%;text-align:center;background:none;border:none;color:#7eb8ff;cursor:pointer;font-size:0.85rem" onclick="showLoginForm()">← Back to Login</button>
       </div>
 
@@ -1086,9 +1079,37 @@
           </div>
           <small>Your API key is stored locally in your browser only. Get one at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></small>
         </div>
+        <div class="form-group" style="border-top:1px solid #2a3345;padding-top:16px;margin-top:4px">
+          <label>Account Recovery</label>
+          <small style="display:block;margin-bottom:10px">A 12-word recovery phrase lets you reset your password without email. Generate one and keep it somewhere safe.</small>
+          <button type="button" class="btn-secondary" onclick="regenerateRecoveryPhrase()">🔑 Show / Regenerate Recovery Phrase</button>
+        </div>
         <div class="modal-actions">
           <button class="btn-secondary close-settings">Cancel</button>
           <button id="saveSettings" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recovery Phrase modal (shown once at registration / when regenerated) -->
+  <div id="recoveryModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>🔑 Your Recovery Phrase</h2>
+      </div>
+      <div class="settings-content">
+        <p style="font-size:0.88rem;color:#ffcf8f;background:#3a2f1a;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+          ⚠️ Write these 12 words down in order and keep them safe. This is the <strong>only</strong> way to reset your password if you forget it — nobody, not even the app owner, can recover it for you.
+        </p>
+        <div id="recoveryPhraseBox" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#1e2535;border-radius:8px;padding:14px;margin-bottom:12px;font-family:monospace;font-size:0.9rem;color:#e0e6f0"></div>
+        <button type="button" class="btn-secondary full-width" onclick="copyRecoveryPhrase()" style="margin-bottom:14px">📋 Copy phrase</button>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#cdd6e6;cursor:pointer;margin-bottom:14px">
+          <input type="checkbox" id="recoveryConfirmChk" onchange="document.getElementById('recoveryContinueBtn').disabled = !this.checked" style="width:auto" />
+          I have written down / saved my recovery phrase
+        </label>
+        <div class="modal-actions">
+          <button id="recoveryContinueBtn" class="btn-primary" onclick="closeRecoveryModal()" disabled>Continue</button>
         </div>
       </div>
     </div>

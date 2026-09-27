@@ -8,7 +8,36 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const multer = require('multer');
+const crypto = require('crypto');
 const { Pool } = require('pg');
+
+// ── RECOVERY PHRASE (seed-phrase account recovery) ──────────────────────────────
+// A 12-word phrase shown once at registration. Stored only as a bcrypt hash — the
+// plaintext is never saved. Used to reset a password without needing email.
+const RECOVERY_WORDS = [
+  'apple','anchor','arrow','autumn','badge','bamboo','banjo','basket','beacon','bison',
+  'bloom','bottle','branch','breeze','bridge','bright','bronze','bubble','bucket','buffalo',
+  'cabin','cactus','candle','canyon','carbon','castle','cedar','cherry','clever','cloud',
+  'clover','cobalt','comet','coral','cotton','crane','crimson','crystal','curve','dawn',
+  'daisy','delta','desert','diamond','dolphin','dragon','dune','eagle','ember','emerald',
+  'engine','falcon','feather','fern','flame','flint','forest','fox','galaxy','garden',
+  'ginger','glacier','globe','golden','granite','grove','harbor','hazel','helm','honey',
+  'ivory','jade','jasper','jungle','kettle','lagoon','lantern','ledger','lemon','lily',
+  'lunar','maple','marble','meadow','mint','mirror','misty','mountain','nectar','nimbus',
+  'north','oak','ocean','olive','onyx','orbit','otter','panda','pebble','pepper',
+  'phoenix','pine','planet','plum','pond','poplar','prairie','quartz','quill','rabbit',
+  'raven','reef','ridge','river','robin','ruby','saffron','sage','salmon','sapphire',
+  'shadow','shell','silver','solar','sparrow','spruce','stone','storm','stream','summit',
+  'sunset','swift','tiger','timber','topaz','tulip','tundra','valley','velvet','violet',
+  'walnut','willow','winter','wolf','zephyr','zenith'
+];
+
+function generateRecoveryPhrase() {
+  const words = [];
+  for (let i = 0; i < 12; i++) words.push(RECOVERY_WORDS[crypto.randomInt(0, RECOVERY_WORDS.length)]);
+  return words.join(' ');
+}
+function normalizePhrase(p) { return (p || '').trim().toLowerCase().replace(/\s+/g, ' '); }
 
 // ── POSTGRESQL SETUP ──────────────────────────────────────────────────────────
 let pool = null;
@@ -450,38 +479,49 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'An account with that email already exists' });
 
   const hash = await bcrypt.hash(password, 10);
-  const user = { id: uuidv4(), username, email: normalizedEmail, passwordHash: hash, createdAt: new Date().toISOString() };
+  const recoveryPhrase = generateRecoveryPhrase();
+  const recoveryHash = await bcrypt.hash(normalizePhrase(recoveryPhrase), 10);
+  const user = { id: uuidv4(), username, email: normalizedEmail, passwordHash: hash, recoveryHash, createdAt: new Date().toISOString() };
   data.users.push(user);
   writeData(data);
 
   req.session.userId = user.id;
   req.session.username = user.username;
-  res.json({ id: user.id, username: user.username });
+  // recoveryPhrase is returned ONCE here and never stored in plaintext
+  res.json({ id: user.id, username: user.username, recoveryPhrase });
 });
 
-app.post('/api/forgot-password', (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-
-  const data = readData();
-  const user = data.users.find(u => u.email === email.trim().toLowerCase());
-  if (!user) return res.status(404).json({ error: 'No account found with that email address' });
-
-  res.json({ username: user.username });
-});
-
-app.post('/api/reset-password', async (req, res) => {
-  const { email, newPassword } = req.body;
-  if (!email || !newPassword) return res.status(400).json({ error: 'Email and new password are required' });
+// Reset a password using the account's recovery phrase (no email needed)
+app.post('/api/reset-with-phrase', async (req, res) => {
+  const { email, phrase, newPassword } = req.body;
+  if (!email || !phrase || !newPassword) return res.status(400).json({ error: 'Email, recovery phrase, and new password are all required' });
   if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
   const data = readData();
   const user = data.users.find(u => u.email === email.trim().toLowerCase());
-  if (!user) return res.status(404).json({ error: 'No account found with that email address' });
+  // Same generic error whether the email or the phrase is wrong (don't leak which)
+  const genericErr = { error: 'The email and recovery phrase do not match any account' };
+  if (!user || !user.recoveryHash) return res.status(400).json(genericErr);
+
+  const ok = await bcrypt.compare(normalizePhrase(phrase), user.recoveryHash);
+  if (!ok) return res.status(400).json(genericErr);
 
   user.passwordHash = await bcrypt.hash(newPassword, 10);
   writeData(data);
-  res.json({ success: true });
+  res.json({ success: true, username: user.username });
+});
+
+// Generate (or regenerate) the recovery phrase for the logged-in user.
+// Returns the plaintext ONCE; only the hash is stored. Any old phrase stops working.
+app.post('/api/recovery/phrase', requireAuth, async (req, res) => {
+  const data = readData();
+  const user = data.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const phrase = generateRecoveryPhrase();
+  user.recoveryHash = await bcrypt.hash(normalizePhrase(phrase), 10);
+  writeData(data);
+  res.json({ phrase });
 });
 
 app.post('/api/login', async (req, res) => {
