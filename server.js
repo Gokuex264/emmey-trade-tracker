@@ -11,33 +11,25 @@ const multer = require('multer');
 const crypto = require('crypto');
 const { Pool } = require('pg');
 
-// ── RECOVERY PHRASE (seed-phrase account recovery) ──────────────────────────────
-// A 12-word phrase shown once at registration. Stored only as a bcrypt hash — the
-// plaintext is never saved. Used to reset a password without needing email.
-const RECOVERY_WORDS = [
-  'apple','anchor','arrow','autumn','badge','bamboo','banjo','basket','beacon','bison',
-  'bloom','bottle','branch','breeze','bridge','bright','bronze','bubble','bucket','buffalo',
-  'cabin','cactus','candle','canyon','carbon','castle','cedar','cherry','clever','cloud',
-  'clover','cobalt','comet','coral','cotton','crane','crimson','crystal','curve','dawn',
-  'daisy','delta','desert','diamond','dolphin','dragon','dune','eagle','ember','emerald',
-  'engine','falcon','feather','fern','flame','flint','forest','fox','galaxy','garden',
-  'ginger','glacier','globe','golden','granite','grove','harbor','hazel','helm','honey',
-  'ivory','jade','jasper','jungle','kettle','lagoon','lantern','ledger','lemon','lily',
-  'lunar','maple','marble','meadow','mint','mirror','misty','mountain','nectar','nimbus',
-  'north','oak','ocean','olive','onyx','orbit','otter','panda','pebble','pepper',
-  'phoenix','pine','planet','plum','pond','poplar','prairie','quartz','quill','rabbit',
-  'raven','reef','ridge','river','robin','ruby','saffron','sage','salmon','sapphire',
-  'shadow','shell','silver','solar','sparrow','spruce','stone','storm','stream','summit',
-  'sunset','swift','tiger','timber','topaz','tulip','tundra','valley','velvet','violet',
-  'walnut','willow','winter','wolf','zephyr','zenith'
-];
+// ── RECOVERY KEY (high-entropy account recovery) ────────────────────────────────
+// A random alphanumeric key shown once at registration. Stored only as a bcrypt
+// hash — the plaintext is never saved. Used to reset a password without email.
+// 24 random chars from a 57-symbol alphabet ≈ 140 bits of entropy: infeasible to
+// guess or brute-force by any computer. Ambiguous chars (0 O 1 I l) are excluded
+// so the key is easy to read without weakening it meaningfully.
+const RECOVERY_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function generateRecoveryPhrase() {
-  const words = [];
-  for (let i = 0; i < 12; i++) words.push(RECOVERY_WORDS[crypto.randomInt(0, RECOVERY_WORDS.length)]);
-  return words.join(' ');
+  const groups = [];
+  for (let g = 0; g < 6; g++) {
+    let s = '';
+    for (let i = 0; i < 4; i++) s += RECOVERY_ALPHABET[crypto.randomInt(0, RECOVERY_ALPHABET.length)];
+    groups.push(s);
+  }
+  return groups.join('-'); // e.g. A7f2-9KqM-3xRt-8Pwv-6JnC-2rHd
 }
-function normalizePhrase(p) { return (p || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+// Match regardless of dashes/spaces/formatting, but case-sensitive (case adds entropy)
+function normalizePhrase(p) { return (p || '').replace(/[\s-]/g, ''); }
 
 // ── POSTGRESQL SETUP ──────────────────────────────────────────────────────────
 let pool = null;

@@ -207,13 +207,10 @@ async function submitPhraseReset() {
 
 // ── RECOVERY PHRASE MODAL ────────────────────────────────────────────────────
 let _recoveryContinueCb = null;
-function showRecoveryPhrase(phrase, onContinue) {
-  window._recoveryPhraseText = phrase;
+function showRecoveryPhrase(key, onContinue) {
+  window._recoveryPhraseText = key;
   _recoveryContinueCb = onContinue || null;
-  const box = document.getElementById('recoveryPhraseBox');
-  box.innerHTML = phrase.split(' ').map((w, i) =>
-    `<span><span style="color:#7f8ba3">${i + 1}.</span> ${w}</span>`
-  ).join('');
+  document.getElementById('recoveryPhraseBox').textContent = key;
   document.getElementById('recoveryConfirmChk').checked = false;
   document.getElementById('recoveryContinueBtn').disabled = true;
   document.getElementById('recoveryModal').classList.remove('hidden');
@@ -229,12 +226,12 @@ function closeRecoveryModal() {
 function copyRecoveryPhrase() {
   const text = window._recoveryPhraseText || '';
   navigator.clipboard.writeText(text)
-    .then(() => showToast('Recovery phrase copied', 'success'))
+    .then(() => showToast('Recovery key copied', 'success'))
     .catch(() => showToast('Could not copy — please write it down', 'error'));
 }
 
 async function regenerateRecoveryPhrase() {
-  if (!confirm('Generate a new recovery phrase? Any previous phrase will stop working.')) return;
+  if (!confirm('Generate a new recovery key? Any previous key will stop working.')) return;
   try {
     const res = await fetch('/api/recovery/phrase', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
     const data = await res.json();
